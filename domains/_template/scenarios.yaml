@@ -1,0 +1,63 @@
+# =============================================================================
+# Scenarios — scenarios.yaml
+# =============================================================================
+# Defines evaluation and demo scenarios for this domain.  Each scenario is a
+# scripted sequence of utterances (participant + text) paired with expected
+# routing outcomes (expect).
+#
+# The packloader stores this list in DomainPack.scenarios.
+# The eval runner replays utterances and compares actual routing decisions to
+# the expect list to compute the rubric metrics.
+#
+# Schema:
+#   scenarios:           (top-level key — required)
+#     - id: <string>     unique scenario identifier
+#       utterances:      list of { participant: <role_id>, text: <string> }
+#       expect:          list of { route_to: <role_id or []>, about: <role_id or label>, signal: <signal_type or "held"> }
+#
+# Tips:
+# - Include at least one scenario where the correct answer is to HOLD all
+#   utterances (recipients: []).  This tests the "minimize misroutes" metric.
+# - Mix signal types across scenarios.
+# - Use only role_ids defined in pack.yaml as participant values.
+# =============================================================================
+
+scenarios:
+
+  # -------------------------------------------------------------------------
+  # Scenario 1 — TODO: Replace with a realistic routing scenario.
+  # Name it to describe the operational situation (e.g., "station_a_blocked").
+  # -------------------------------------------------------------------------
+  - id: example_routing_scenario
+    utterances:
+      # TODO: Replace with realistic utterances for your domain.
+      - { participant: role_a, text: "I'm backed up and need help from role_b" }
+      - { participant: role_b, text: "on it" }
+    expect:
+      # role_a's utterance should route to role_b as a dependency signal
+      - { route_to: role_b, about: role_a, signal: dependency }
+      # role_b's "on it" is a backchannel and must be held
+      - { route_to: [],     about: role_b, signal: held }
+
+  # -------------------------------------------------------------------------
+  # Scenario 2 — TODO: Replace with a scenario that tests the "held" path.
+  # All utterances in this scenario should be held (no routing).
+  # -------------------------------------------------------------------------
+  - id: all_chatter_no_routes
+    utterances:
+      # TODO: Replace with utterances that are self-contained chatter.
+      - { participant: role_a, text: "quiet day today" }
+      - { participant: role_b, text: "yeah, nothing going on" }
+    expect:
+      # Both utterances are chatter — all held
+      - { route_to: [], about: role_a, signal: held }
+      - { route_to: [], about: role_b, signal: held }
+
+  # -------------------------------------------------------------------------
+  # Scenario 3 — TODO: Add a third scenario.  Aim for a mix of signal types.
+  # -------------------------------------------------------------------------
+  # - id: another_scenario
+  #   utterances:
+  #     - { participant: role_a, text: "..." }
+  #   expect:
+  #     - { route_to: role_b, about: role_a, signal: request }

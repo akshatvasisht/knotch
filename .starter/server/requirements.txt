@@ -1,0 +1,12 @@
+# Convener participant worker — Pipecat Cloud image deps.
+# Mirrors .starter/server/pyproject.toml. Pinned floors only; the base image
+# already provides a compatible Python 3.12 + pipecat runtime, but we install
+# the extras the worker actually imports so the build is self-contained.
+pipecat-ai[daily,gradium,openai,runner,silero,webrtc,websocket]>=1.3.0
+redis>=8.0.0
+websockets>=16.0
+python-dotenv>=1.2.0
+loguru>=0.7.2
+aiohttp>=3.10.0
+soxr>=0.5.0
+numpy>=1.26.0

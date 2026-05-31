@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knotch · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & base ─────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Mesh-gradient backdrop — richer, more vivid, still soft-blurred ───── */
+  .bg-mesh {
+    position: fixed; inset: 0; z-index: -2; overflow: hidden;
+    -webkit-mask-image: radial-gradient(circle at 100% 100%, #000 0%, #000 48%, transparent 88%);
+            mask-image: radial-gradient(circle at 100% 100%, #000 0%, #000 48%, transparent 88%);
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); }
+  /* Together.ai-flavored mesh: signature coral, soft lavender/indigo, warm peach */
+  .blob-blue   { background:#febea3; width:74vw; height:40vw; right:-12vw; bottom:-8vw;  opacity:0.48; }
+  .blob-green  { background:#7a5cf5; width:40vw; height:64vw; right:6vw;   bottom:-18vw; opacity:0.42; }
+  .blob-yellow { background:#fc4c02; width:44vw; height:34vw; right:-4vw;  bottom:12vw;  opacity:0.58; }
+  .bg-noise {
+    position: fixed; inset: 0; z-index: -1; opacity: 0.05; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  :root {
+    /* Together.ai-inspired palette — warm cream paper, deep midnight-ink
+       (#010120) borders/text, signature coral accent (#fc4c02) that POPS for
+       information moving, with an indigo secondary signal. Editorial + refined,
+       still high-contrast for a projector. */
+    --bg:        #f7f3ec;   /* warm cream / paper */
+    --surface:   rgba(255,255,255,0.70);   /* translucent — the gradient tints through */
+    --surface2:  rgba(240,233,221,0.72);   /* warm soft fill, translucent */
+    --border:    #0a0a1f;   /* together midnight ink (near-black) */
+    --muted:     #6a6478;
+    --text:      #0a0a1f;
+    --text-dim:  #5a5566;
+    --accent:    #fc4c02;   /* together brand coral — the signal color */
+    --accent-dk: #c2370c;
+    --accent-soft:#ffe1d3;  /* pale coral tint */
+    --warn:      #6a4cf0;   /* together indigo/violet — distinct from coral */
+    --warn-soft: #e7e1ff;
+    --danger:    #e0233a;   /* alert red — used sparingly */
+    --ok:        #0fa896;   /* together teal — calm success (acted badges) */
+    --ok-soft:   #cdf2ec;
+    --live:      #00b3c4;   /* together cyan-teal — the "live" status signal */
+    --font-mono: "Space Mono", monospace;
+    --font-sans: "DM Sans", sans-serif;
+    /* Bold shadow system — real contrast, hard offset (midnight ink) */
+    --shadow-card:  3px 3px 0px 0px rgba(10,10,31,0.85);
+    --shadow-panel: 5px 5px 0px 0px rgba(10,10,31,0.85);
+  }
+
+  html { height: 100%; background: var(--bg); }
+  body { height: 100%; background: transparent; color: var(--text); font-family: var(--font-sans); font-size: 15px; line-height: 1.4; }
+
+  /* ── Top bar — fully transparent so the gradient is continuous; a strong
+       bottom rule + soft shadow reads as an intentional header (seam fix). ─ */
+  #topbar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 0 22px; height: 54px;
+    background: transparent;
+    border-bottom: 2px solid var(--border);
+    box-shadow: 0 2px 14px -6px rgba(10,10,31,0.45);
+    font-size: 13px; flex-shrink: 0; position: relative; z-index: 5;
+  }
+  #topbar .brand {
+    font-size: 17px; font-weight: 900; letter-spacing: 0.14em;
+    color: var(--accent); text-transform: uppercase;
+    font-family: var(--font-sans);
+  }
+  #topbar .sep { color: var(--border); font-weight: 700; opacity: 0.4; }
+  #domain-label { color: var(--text); font-weight: 700; font-family: var(--font-mono); }
+  .stat { color: var(--text-dim); font-weight: 600; }
+  .stat span { color: var(--text); font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-weight: 700; }
+  #bus-status { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.10em; }
+  .dot {
+    width: 11px; height: 11px; border-radius: 0;
+    background: var(--muted); border: 2px solid var(--border);
+  }
+  .dot.live { background: var(--live); border-color: var(--border); animation: brutalist-pulse 1.2s steps(1) infinite; }
+  .dot.replay { background: var(--warn); border-color: var(--border); }
+  /* Make the whole status pill cohesive: the label tracks the dot's state color. */
+  #bus-status:has(.dot.live) #bus-label   { color: var(--live); }
+  #bus-status:has(.dot.replay) #bus-label { color: var(--warn); }
+  @keyframes brutalist-pulse { 0%,49%{opacity:1} 50%,100%{opacity:0.25} }
+
+  /* ── Main layout ──────────────────────────────────────────────────────── */
+  #main {
+    display: grid;
+    grid-template-columns: 1.25fr 1.3fr 0.85fr;
+    gap: 20px; padding: 20px;
+    height: calc(100vh - 54px);
+    overflow: hidden;
+  }
+  .panel {
+    display: flex; flex-direction: column;
+    overflow: hidden; min-height: 0;
+    background: transparent;
+  }
+  .panel-header {
+    padding: 9px 4px;
+    border-bottom: 2.5px solid var(--border);
+    font-size: 11px; font-weight: 900; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text);
+    font-family: var(--font-sans);
+    background: transparent;
+    flex-shrink: 0; margin-bottom: 12px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .panel-header .ph-count {
+    font-family: var(--font-mono); font-weight: 700; font-size: 11px;
+    color: var(--accent); letter-spacing: 0.04em;
+  }
+  /* Reserve gutter so the scrollbar never overlaps card content/borders. */
+  .panel-body { flex: 1; overflow-y: auto; padding: 4px; scrollbar-gutter: stable; }
+
+  /* ── Scrollbar — thin, inset, never covering content ──────────────────── */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border); border-radius: 0;
+    border: 2px solid transparent; background-clip: padding-box;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     PANEL 1 — Participant Channels.
+     ONE fluid auto-fill grid of small uniform cells. Same CSS at N=4 and
+     N=200: cells keep a fixed min width and simply reflow denser as N grows.
+     Idle = compact status cell (name + dot + last class). Active channels
+     lift via .speaking (cobalt border + scale + shadow). The single focus
+     panel below shows the live transcript of whatever last spoke.
+     ═══════════════════════════════════════════════════════════════════════ */
+  #p1-body { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
+
+  #lanes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 8px;
+    align-content: start;
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    scrollbar-gutter: stable; padding-right: 4px;
+  }
+  /* Compact channel cell — the universal building block at any N. */
+  .lane {
+    border: 2px solid var(--border);
+    background: var(--surface);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    box-shadow: 2px 2px 0 0 rgba(10,10,31,0.55);
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s, background 0.12s;
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 7px 8px; min-height: 52px;
+    cursor: pointer; position: relative;
+  }
+  .lane:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 0 var(--border); }
+  .lane-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em;
+    text-transform: uppercase; color: var(--text);
+    font-family: var(--font-sans);
+    min-width: 0;
+  }
+  .lane-header span {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+  }
+  .speak-dot {
+    width: 9px; height: 9px; border-radius: 0;
+    background: var(--surface2); border: 2px solid var(--border);
+    flex-shrink: 0; transition: background 0.1s;
+  }
+  /* Speaking is signalled ONLY by the per-cell dot flashing — the cell itself
+     stays calm (border/bg unchanged). A quick color pulse to --live reads as
+     "this channel is talking" without lifting/recoloring the whole cell. */
+  .speak-dot.speaking { animation: dot-pulse 0.6s steps(1) infinite; }
+  @keyframes dot-pulse {
+    0%,49%  { background: var(--live);    border-color: var(--border); }
+    50%,100%{ background: var(--surface2); border-color: var(--border); }
+  }
+  /* Last-utterance preview — kept as a very dim single line (no duplication of
+     the dot signal; it's a quiet content hint, not a status badge). */
+  .lane-tag {
+    font-family: var(--font-mono); font-size: 9.5px; line-height: 1.2;
+    color: var(--text-dim); opacity: 0.55;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-height: 12px;
+  }
+  /* ACTIVE: the cell stays calm while speaking — only the dot flashes (above).
+     No border/bg/transform change, so a busy channel doesn't strobe the grid. */
+  /* Route flash — recipient cell pulses gold once then settles (short, so it
+     doesn't smear in a fast feed). */
+  .lane.flashing { animation: lane-flash 0.6s steps(1) 1; }
+  @keyframes lane-flash {
+    0%   { background: var(--warn); border-color: var(--border); box-shadow: 3px 3px 0 0 var(--warn); transform: translate(-1px,-1px); }
+    100% { background: var(--surface); }
+  }
+  /* Hidden transcript store — keeps the JS contract (laneMap.transcript)
+     working without rendering 100 scrolling transcripts. Click promotes a
+     cell into the focus panel. */
+  .lane-transcript { display: none; }
+
+  /* Focus panel — the ONE place a live transcript is shown. */
+  #focus {
+    flex: 0 0 auto; border: 2.5px solid var(--border);
+    background: var(--surface); box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; max-height: 38%;
+  }
+  #focus-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 11px; border-bottom: 2px solid var(--border);
+    background: var(--surface2);
+    font-size: 11px; font-weight: 900; letter-spacing: 0.10em; text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  /* Focus dot reflects the focused channel's REAL state: neutral (muted) by
+     default, flashing --live only while that channel is actively speaking. */
+  #focus-head .fh-dot { width: 9px; height: 9px; background: var(--muted); border: 2px solid var(--border); }
+  #focus-head .fh-dot.speaking { animation: dot-pulse 0.6s steps(1) infinite; }
+  #focus-name { color: var(--accent); }
+  #focus-body {
+    flex: 1; overflow-y: auto; padding: 9px 11px;
+    font-family: var(--font-mono); font-size: 13px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #focus-body:empty::before {
+    content: "click a channel — or the latest speaker shows here";
+    color: var(--text-dim); font-style: italic; font-size: 12px; opacity: 0.7;
+  }
+  /* Entrance = quick opacity fade only (no transform shove — a fast feed must
+     not look like a full reload). */
+  .bubble { padding: 3px 6px; line-height: 1.35; word-break: break-word; animation: fadeIn 0.12s ease; }
+  .bub-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); opacity: 0.65; margin-right: 7px; }
+  #focus-body .bubble { opacity: 0.5; transition: opacity 0.2s; }
+  #focus-body .bubble:last-child { opacity: 1; font-weight: 700; }
+  .bubble.own { background: transparent; color: var(--text); }
+  .bubble.received { background: var(--accent); color: #fff; border-left: 5px solid var(--border); font-weight: 700; }
+  .bubble.turn-tick { color: var(--text-dim); font-size: 11px; font-style: italic; padding: 1px 6px; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     PANEL 2 — Convener Trace.  Shared state = compact stat tiles (aggregate,
+     never enumerate). Trace = newest-first compact decision cards.
+     ═══════════════════════════════════════════════════════════════════════ */
+  /* Panel 2: state tiles PINNED at top (never scroll); only the decisions log
+     scrolls below them. p2-body is a non-scrolling flex column. */
+  #p2-body { padding: 4px; display: flex; flex-direction: column; overflow: hidden; }
+  #state-section { flex-shrink: 0; margin-bottom: 16px; }
+  #decisions-section {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .section-label {
+    font-size: 10px; font-weight: 900; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 5px; margin-bottom: 10px;
+    font-family: var(--font-sans);
+  }
+  /* Stat tiles — bold aggregate summary. */
+  #state-list {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px; min-height: 24px;
+  }
+  .stat-tile {
+    border: 2px solid var(--border); background: var(--surface);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    box-shadow: 2px 2px 0 0 rgba(10,10,31,0.7);
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .stat-tile .st-val {
+    font-family: var(--font-mono); font-size: 22px; font-weight: 700;
+    line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .stat-tile .st-lbl {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.10em;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+  /* Alerts tile turns red only when there's something to attend to. */
+  .stat-tile .st-val.st-alert { color: var(--danger); }
+  .st-val.changed { animation: flash-accent 0.5s steps(2); }
+  @keyframes flash-accent {
+    0%,49%  { color: var(--warn); }
+    50%,100%{ color: var(--accent); }
+  }
+  .roll-seg { display: inline; }
+  .roll-seg.alert { color: var(--danger); font-weight: 700; }
+  .roll-sep { color: var(--text-dim); opacity: 0.5; margin: 0 4px; }
+
+  /* ── Routing decisions = a dense scannable LOG, not cards ──────────────────
+     One monospace row per ROUTED decision; held decisions collapse into a
+     single dim counter line. Thin dividers, no card chrome. */
+  .section-label.decisions-label { flex-shrink: 0; }
+  #decisions-list {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-gutter: stable;
+    display: flex; flex-direction: column;
+  }
+
+  /* One routed decision = one dense log row. */
+  .dec-row {
+    padding: 5px 8px 5px 10px;
+    border-bottom: 1px solid rgba(10,10,31,0.12);
+    border-left: 4px solid transparent;   /* urgency marker slot */
+    animation: fadeIn 0.12s ease;
+  }
+  /* Urgent rows are the ONLY colored thing — a red left-border. */
+  .dec-row.urgent { border-left-color: var(--danger); }
+
+  .dec-line {
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.3;
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .dec-time {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 400;
+    color: var(--text-dim); opacity: 0.6; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .dec-route {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    color: var(--text-dim); flex-shrink: 0; letter-spacing: 0.01em;
+  }
+  .dec-route .arrow { color: var(--accent); margin: 0 4px; font-weight: 900; }
+  /* HERO: the derived dispatcher message — the brightest element on the row. */
+  .dec-message {
+    font-family: var(--font-mono); font-size: 12.5px; font-weight: 700;
+    color: var(--text); flex: 1 1 200px; min-width: 0;
+  }
+  /* Rationale — dim secondary subline under routed rows only. */
+  .dec-rationale {
+    font-size: 10.5px; color: var(--text-dim); font-style: italic;
+    font-family: var(--font-mono); opacity: 0.8;
+    margin-top: 2px; padding-left: 0;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* Outcome — a tiny subtle marker appended to the route, not a chip. */
+  .dec-outcome { font-weight: 700; flex-shrink: 0; font-size: 12px; }
+  .dec-outcome.acted   { color: var(--ok); }
+  .dec-outcome.ignored { color: var(--text-dim); opacity: 0.7; }
+  .dec-outcome.missed  { color: var(--danger); }
+
+  /* Held counter — ONE dim line standing in for all held decisions. */
+  .held-counter {
+    font-family: var(--font-mono); font-size: 11.5px;
+    color: var(--text-dim); opacity: 0.7;
+    padding: 6px 8px 6px 10px; cursor: pointer;
+    border-bottom: 1px solid rgba(10,10,31,0.12);
+    user-select: none;
+  }
+  .held-counter:hover { opacity: 1; }
+  .held-counter .hc-dot { margin-right: 6px; opacity: 0.5; }
+  .held-counter .hc-hint { font-size: 9.5px; opacity: 0.6; margin-left: 6px; }
+  /* Expanded held rows — even dimmer one-liners. */
+  .held-rows { display: none; }
+  .held-rows.open { display: block; }
+  .held-row {
+    font-family: var(--font-mono); font-size: 11px; line-height: 1.3;
+    color: var(--text-dim); opacity: 0.6;
+    padding: 3px 8px 3px 22px;
+    border-bottom: 1px solid rgba(10,10,31,0.08);
+  }
+  .held-row .hr-time { font-size: 9.5px; opacity: 0.7; margin-right: 6px; }
+
+  /* ── Panel 3: Improvement curves ─────────────────────────────────────── */
+  #p3-body { display: flex; flex-direction: column; gap: 14px; padding: 4px; }
+  .curve-block {
+    border: 2px solid var(--border); box-shadow: var(--shadow-card);
+    padding: 10px 12px; background: var(--surface);
+  }
+  .curve-label {
+    font-size: 11px; font-weight: 900; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text); margin-bottom: 8px;
+    font-family: var(--font-sans);
+  }
+  .curve-canvas-wrap { position: relative; height: 60px; }
+  canvas.curve { width: 100%; height: 60px; display: block; }
+  .curve-no-data { font-size: 11px; color: var(--text-dim); font-style: italic; padding: 8px 0; font-family: var(--font-mono); }
+
+  .prompt-diff-block { border-top: 2px solid var(--border); padding-top: 12px; margin-top: 4px; }
+  .prompt-diff-label {
+    font-size: 10px; font-weight: 900; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text); margin-bottom: 8px;
+    font-family: var(--font-sans);
+  }
+  .prompt-diff-text {
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--text); background: var(--surface2);
+    border: 2px solid var(--border); border-left: 4px solid var(--accent);
+    padding: 8px 12px; box-shadow: var(--shadow-card);
+    line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    max-height: 260px; overflow-y: auto;
+  }
+  .flagged-block { border-top: 2px solid var(--border); padding-top: 12px; margin-top: 4px; }
+  .flagged-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .flagged-list li {
+    font-family: var(--font-mono); font-size: 11px; line-height: 1.4;
+    color: var(--text); background: var(--surface);
+    border: 2px solid var(--border); border-left: 4px solid var(--danger);
+    box-shadow: 2px 2px 0 0 var(--border); padding: 6px 9px;
+  }
+  .scored-by-block { border-top: 2px solid var(--border); padding-top: 12px; margin-top: 4px; }
+  .scored-by-label {
+    font-size: 10px; font-weight: 900; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text); margin-bottom: 4px;
+    font-family: var(--font-sans);
+  }
+  .scored-by-text { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+
+  /* ── Cekura per-metric judge scores (Panel 3) ───────────────────────────── */
+  .cekura-scores-block { border-top: 2px solid var(--border); padding-top: 12px; margin-top: 4px; }
+  .cekura-metric-row {
+    background: var(--surface); border: 2px solid var(--border);
+    border-left: 4px solid var(--accent); box-shadow: var(--shadow-card);
+    padding: 8px 10px; margin-bottom: 8px;
+  }
+  .cekura-metric-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 8px; margin-bottom: 6px;
+  }
+  .cekura-metric-name {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    color: var(--text); letter-spacing: 0.02em; word-break: break-word;
+  }
+  .cekura-metric-caption {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .cekura-bar-track {
+    position: relative; height: 12px; background: var(--surface2);
+    border: 2px solid var(--border); overflow: hidden;
+  }
+  .cekura-bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: var(--accent); transition: width 0.4s ease;
+  }
+  .cekura-metric-row details { margin-top: 7px; }
+  .cekura-metric-row summary {
+    font-family: var(--font-sans); font-size: 10px; font-weight: 900;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+    cursor: pointer; user-select: none;
+  }
+  .cekura-expl-list { list-style: none; margin: 6px 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 5px; }
+  .cekura-expl-list li {
+    font-family: var(--font-mono); font-size: 11px; line-height: 1.4;
+    color: var(--text); background: var(--surface2);
+    border: 1px solid var(--border); border-left: 3px solid var(--danger);
+    padding: 5px 8px;
+  }
+  .cekura-expl-list li.pass { border-left-color: var(--ok); }
+  .cekura-expl-list li .cekura-expl-scn { font-weight: 700; color: var(--accent); }
+
+  .empty-hint { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 8px 0; font-family: var(--font-mono); }
+
+  #replay-banner {
+    display: none;
+    background: var(--warn); color: #fff; font-weight: 900;
+    text-align: center; padding: 4px; font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase; border-bottom: 2px solid var(--border);
+    font-family: var(--font-sans);
+  }
+</style>
+</head>
+<body>
+
+<!-- Mesh-gradient backdrop (decorative, behind everything) -->
+<div class="bg-mesh" aria-hidden="true">
+  <div class="blob blob-blue"></div>
+  <div class="blob blob-green"></div>
+  <div class="blob blob-yellow"></div>
+</div>
+<div class="bg-noise" aria-hidden="true"></div>
+
+
+<!-- Top bar -->
+<div id="topbar">
+  <span class="brand">Knotch</span>
+  <span class="sep">·</span>
+  <span id="domain-label">—</span>
+  <span class="stat">N=<span id="stat-n">0</span> live</span>
+  <span class="stat">latency <span id="stat-latency">—</span></span>
+  <div id="bus-status">
+    <div class="dot" id="bus-dot"></div>
+    <span id="bus-label">connecting</span>
+  </div>
+</div>
+
+<!-- Three-panel layout -->
+<div id="main">
+
+  <!-- Panel 1: Participant Channels -->
+  <div class="panel" id="panel1">
+    <div class="panel-header">Participant Channels</div>
+    <div class="panel-body" id="p1-body">
+      <div id="lanes">
+        <div class="empty-hint">Waiting for init…</div>
+      </div>
+      <div id="focus">
+        <div id="focus-head"><div class="fh-dot"></div><span id="focus-name">—</span></div>
+        <div id="focus-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Convener Trace -->
+  <div class="panel" id="panel2">
+    <div class="panel-header">Convener Trace</div>
+    <div class="panel-body" id="p2-body">
+
+      <div id="state-section">
+        <div id="state-list"><div class="empty-hint">No state updates yet</div></div>
+      </div>
+
+      <div id="decisions-section">
+        <div class="section-label decisions-label">Routing Decisions</div>
+        <div id="decisions-list"><div class="empty-hint">No decisions yet</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Panel 3: Improvement -->
+  <div class="panel" id="panel3">
+    <div class="panel-header">Improvement</div>
+    <div class="panel-body" id="p3-body">
+
+      <div class="curve-block">
+        <div class="curve-label">Misroute ↓</div>
+        <div class="curve-canvas-wrap"><canvas id="curve-misroute" class="curve"></canvas></div>
+        <div class="curve-no-data" id="nd-misroute">Awaiting eval data…</div>
+      </div>
+
+      <div class="curve-block">
+        <div class="curve-label">Missed Route ↓</div>
+        <div class="curve-canvas-wrap"><canvas id="curve-missed" class="curve"></canvas></div>
+        <div class="curve-no-data" id="nd-missed">Awaiting eval data…</div>
+      </div>
+
+      <div class="curve-block">
+        <div class="curve-label">Time-to-Action ↓</div>
+        <div class="curve-canvas-wrap"><canvas id="curve-tta" class="curve"></canvas></div>
+        <div class="curve-no-data" id="nd-tta">Awaiting eval data…</div>
+      </div>
+
+      <div class="scored-by-block" id="scored-by-block" style="display:none">
+        <div class="scored-by-label">Scored by</div>
+        <div class="scored-by-text" id="scored-by-text"></div>
+        <div class="scored-by-label" style="margin-top:8px;">Optimizer</div>
+        <div class="scored-by-text" id="optimizer-text"></div>
+      </div>
+
+      <div class="cekura-scores-block" id="cekura-scores-block" style="display:none">
+        <div class="prompt-diff-label">Cekura Judge Scores (this run)</div>
+        <div id="cekura-metric-bars"></div>
+      </div>
+
+      <div class="flagged-block" id="flagged-block" style="display:none">
+        <div class="prompt-diff-label">What the judge flagged</div>
+        <ul class="flagged-list" id="flagged-list"></ul>
+      </div>
+
+      <div class="prompt-diff-block" id="prompt-diff-block" style="display:none">
+        <div class="prompt-diff-label">→ Prompt the optimizer rewrote</div>
+        <div class="prompt-diff-text" id="prompt-diff-text"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- #main -->
+
+<script>
+(function() {
+'use strict';
+
+/* ── State ─────────────────────────────────────────────────────────────── */
+const state = {
+  roles: [],
+  domain: '',
+  decisions: {},
+  decOrder: [],
+  latencies: [],          // rolling route-latency samples (seconds, last ~20)
+  lastUtteranceTs: {},    // role_id -> ts of that channel's most recent utterance
+  curves: { misroute: null, missed: null, time_to_action: null },
+  classes: {},        // role_id -> latest triage_class / status tag
+  focusId: null,      // currently promoted channel
+  speakingCount: 0,
+};
+
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function displayName(role_id) {
+  const r = state.roles.find(x => x.role_id === role_id);
+  return r ? r.display_name : role_id;
+}
+function flash(el, cls='flashing', ms=800) {
+  el.classList.add(cls);
+  setTimeout(()=>el.classList.remove(cls), ms);
+}
+function scrollBottom(el) { el.scrollTop = el.scrollHeight; }
+
+/* ── Lane (channel cell) management ─────────────────────────────────────── */
+const laneContainer = document.getElementById('lanes');
+const laneMap = {};   // role_id -> {el, transcript, speakDot}
+const focusBody = document.getElementById('focus-body');
+const focusName = document.getElementById('focus-name');
+const focusDot  = document.querySelector('#focus-head .fh-dot');
+
+// Sync the focus-head dot to the focused channel's real speaking state.
+function syncFocusDot() {
+  if (!focusDot) return;
+  const lane = state.focusId ? laneMap[state.focusId] : null;
+  const speaking = !!(lane && lane.speakDot.classList.contains('speaking'));
+  focusDot.classList.toggle('speaking', speaking);
+}
+
+function setFocus(role_id) {
+  const lane = laneMap[role_id];
+  if (!lane) return;
+  state.focusId = role_id;
+  focusName.textContent = displayName(role_id);
+  syncFocusDot();
+  // Mirror the hidden transcript store into the focus panel.
+  focusBody.innerHTML = '';
+  Array.from(lane.transcript.children).forEach(b => {
+    focusBody.appendChild(b.cloneNode(true));
+  });
+  scrollBottom(focusBody);
+}
+
+function buildLanes(roles) {
+  laneContainer.innerHTML = '';
+  roles.forEach(r => {
+    const lane = document.createElement('div');
+    lane.className = 'lane';
+    lane.id = 'lane-' + r.role_id;
+
+    const hdr = document.createElement('div');
+    hdr.className = 'lane-header';
+    const dot = document.createElement('div');
+    dot.className = 'speak-dot';
+    const label = document.createElement('span');
+    label.textContent = r.display_name;
+    hdr.appendChild(dot);
+    hdr.appendChild(label);
+    lane.appendChild(hdr);
+
+    const tag = document.createElement('div');
+    tag.className = 'lane-tag';
+    tag.textContent = 'idle';
+    lane.appendChild(tag);
+
+    // Hidden transcript store — preserves the JS contract without rendering
+    // a transcript in every cell.
+    const transcript = document.createElement('div');
+    transcript.className = 'lane-transcript';
+    lane.appendChild(transcript);
+
+    lane.addEventListener('click', () => setFocus(r.role_id));
+
+    laneContainer.appendChild(lane);
+    laneMap[r.role_id] = { el: lane, transcript, speakDot: dot, tag };
+  });
+
+  const n = roles.length;
+  document.getElementById('stat-n').textContent = n;  // single source of channel count (topbar)
+  if (n) setFocus(roles[0].role_id);
+}
+
+function appendBubble(role_id, text, cls='own', ts) {
+  const lane = laneMap[role_id];
+  if (!lane) return;
+  const b = document.createElement('div');
+  b.className = 'bubble ' + cls;
+  // Real messages ('own'/'received') get a time prefix in the channel log;
+  // ephemeral turn-ticks stay untimed. Time carries into the focus panel
+  // because setFocus clones the bubbles.
+  if (cls !== 'turn-tick') {
+    const t = document.createElement('span');
+    t.className = 'bub-time';
+    t.textContent = (ts ? new Date(ts * 1000) : new Date()).toLocaleTimeString([], { hour12: false });
+    b.appendChild(t);
+    b.appendChild(document.createTextNode(text));
+  } else {
+    b.textContent = text;
+  }
+  lane.transcript.appendChild(b);
+  const MAX_BUBBLES = 6;
+  while (lane.transcript.children.length > MAX_BUBBLES) {
+    lane.transcript.removeChild(lane.transcript.firstChild);
+  }
+  // Surface a compact status tag on the cell.
+  if (cls === 'own' && lane.tag) {
+    lane.tag.textContent = text.length > 22 ? text.slice(0,22) + '…' : text;
+  }
+  // The latest speaker auto-promotes to the focus panel (unless the user has
+  // pinned a different channel by clicking — we still follow the live one).
+  setFocus(role_id);
+}
+
+function flashLane(role_id) {
+  const lane = laneMap[role_id];
+  if (lane) flash(lane.el, 'flashing', 1600);
+}
+
+/* ── Shared state panel — compact aggregate tiles ───────────────────────── */
+const stateList = document.getElementById('state-list');
+const rawState = {};   // full key->value, kept for aggregation only
+
+/* Derive a coarse class bucket from a tag/value string (domain-agnostic). */
+function classifyTag(v) {
+  const s = String(v == null ? '' : v).toLowerCase();
+  if (!s || s === 'idle' || s === 'none' || s === '—') return 'idle';
+  if (s.includes('alert') || s.includes('urgent') || s.includes('danger') || s.includes('high')) return 'alert';
+  return 'status';
+}
+
+function renderStateTiles() {
+  // Aggregate, don't enumerate. Roll up per-channel status into a few tiles.
+  const roleIds = state.roles.map(r => r.role_id);
+  const N = roleIds.length;
+  let idle = 0, status = 0, alert = 0;
+  roleIds.forEach(rid => {
+    const b = classifyTag(state.classes[rid]);
+    if (b === 'alert') alert++; else if (b === 'status') status++; else idle++;
+  });
+  const active = state.speakingCount;
+  const turns = state.decOrder.length;
+
+  stateList.innerHTML = '';
+  const tile = (val, lbl, valClass='') => {
+    const t = document.createElement('div');
+    t.className = 'stat-tile';
+    t.innerHTML = `<div class="st-val ${valClass}">${val}</div><div class="st-lbl">${lbl}</div>`;
+    return t;
+  };
+  // Three uniform tiles, all dynamic + actionable. The static channel total
+  // lives in the topbar (N=); per-channel idle/active state lives in each cell.
+  // The one aggregate worth surfacing is ALERTS — channels needing attention.
+  stateList.appendChild(tile(active, 'speaking now'));
+  stateList.appendChild(tile(turns, 'turns routed'));
+  const alertTile = tile(alert, 'alerts', alert ? 'st-alert' : '');
+  stateList.appendChild(alertTile);
+}
+
+function updateState(updates) {
+  Object.entries(updates).forEach(([k, v]) => { rawState[k] = v; });
+  // Map any zone/role-namespaced status keys onto per-channel class buckets so
+  // the rollup reflects them. Keys like "<role>:last" / "<role>:status".
+  Object.entries(updates).forEach(([k, v]) => {
+    const m = k.match(/^(.*?):(?:last|status|class|state)$/i);
+    if (m && laneMap[m[1]]) {
+      state.classes[m[1]] = v;
+      if (laneMap[m[1]].tag) laneMap[m[1]].tag.textContent =
+        String(v).length > 22 ? String(v).slice(0,22)+'…' : String(v);
+    }
+  });
+  renderStateTiles();
+}
+
+/* ── Decisions panel — a dense scannable LOG ─────────────────────────────────
+   Routed decisions render as single dense one-liner rows (newest on top);
+   held decisions never each render a row — they collapse into one dim counter
+   line pinned at the bottom that expands on click. */
+const decisionsList = document.getElementById('decisions-list');
+
+// Held tracking: counter line + (lazily built) expandable container.
+const heldState = { count: 0, ids: [], rowsEl: null, counterEl: null, open: false };
+
+function fmtTime(ts) {
+  const d = ts ? new Date(ts * 1000) : new Date();
+  return d.toLocaleTimeString([], { hour12: false });
+}
+
+function outcomeMark(outcome) {
+  switch (outcome) {
+    case 'acted':   return ['✓', 'acted'];
+    case 'ignored': return ['·', 'ignored'];
+    case 'missed':  return ['✗', 'missed'];
+    default:        return ['',  ''];
+  }
+}
+
+/* Build a single routed log row. */
+function buildRoutedRow(payload, ts) {
+  const { decision_id, source, recipients, message, urgency, rationale } = payload;
+
+  const row = document.createElement('div');
+  row.className = 'dec-row' + (urgency === 'high' ? ' urgent' : '');
+  row.dataset.decisionId = decision_id;
+
+  const line = document.createElement('div');
+  line.className = 'dec-line';
+
+  const tEl = document.createElement('span');
+  tEl.className = 'dec-time';
+  tEl.textContent = fmtTime(ts);
+  line.appendChild(tEl);
+
+  const toList = recipients.map(displayName).join(', ');
+  const route = document.createElement('span');
+  route.className = 'dec-route';
+  route.innerHTML = `${esc(displayName(source))}<span class="arrow">▶</span>${esc(toList)}`;
+  line.appendChild(route);
+
+  const msg = document.createElement('span');
+  msg.className = 'dec-message';
+  msg.textContent = message ? '"' + message + '"' : '';
+  line.appendChild(msg);
+
+  // Subtle outcome marker slot (filled by applyEvalScore).
+  const out = document.createElement('span');
+  out.className = 'dec-outcome';
+  out.dataset.outcome = '1';
+  line.appendChild(out);
+
+  row.appendChild(line);
+
+  if (rationale) {
+    const rat = document.createElement('div');
+    rat.className = 'dec-rationale';
+    rat.textContent = 'why: ' + rationale;
+    row.appendChild(rat);
+  }
+  return row;
+}
+
+/* Ensure the held counter line + expandable rows container exist & are pinned
+   at the bottom of the list. */
+function ensureHeldEls() {
+  if (!heldState.rowsEl) {
+    heldState.rowsEl = document.createElement('div');
+    heldState.rowsEl.className = 'held-rows';
+  }
+  if (!heldState.counterEl) {
+    const c = document.createElement('div');
+    c.className = 'held-counter';
+    c.addEventListener('click', () => {
+      heldState.open = !heldState.open;
+      heldState.rowsEl.classList.toggle('open', heldState.open);
+      renderHeldCounter();
+    });
+    heldState.counterEl = c;
+  }
+  // Keep counter + rows at the very bottom of the list.
+  decisionsList.appendChild(heldState.counterEl);
+  decisionsList.appendChild(heldState.rowsEl);
+}
+
+function renderHeldCounter() {
+  if (!heldState.counterEl) return;
+  const arrow = heldState.open ? '▾' : '▸';
+  heldState.counterEl.innerHTML =
+    `<span class="hc-dot">·</span>${arrow} ${heldState.count} held` +
+    `<span class="hc-hint">(chatter · acks · already-known)</span>`;
+  heldState.counterEl.style.display = heldState.count ? 'block' : 'none';
+}
+
+function addHeld(payload, ts) {
+  ensureHeldEls();
+  heldState.count++;
+  heldState.ids.unshift(payload.decision_id);
+
+  const hr = document.createElement('div');
+  hr.className = 'held-row';
+  hr.dataset.decisionId = payload.decision_id;
+  hr.innerHTML = `<span class="hr-time">${esc(fmtTime(ts))}</span>${esc(displayName(payload.source))} · held`;
+  heldState.rowsEl.insertBefore(hr, heldState.rowsEl.firstChild);
+
+  renderHeldCounter();
+}
+
+/* Route latency = (routing_decision ts) − (source channel's last utterance ts),
+   as a rolling average of the last ~20 samples. Both envelopes carry ts (epoch
+   seconds float). Updates the topbar #stat-latency. */
+function updateLatency(payload, ts) {
+  if (ts == null) return;
+  const src = payload.source;
+  const uTs = src != null ? state.lastUtteranceTs[src] : undefined;
+  if (uTs == null) return;
+  const delta = ts - uTs;
+  if (!isFinite(delta) || delta < 0 || delta > 600) return;  // guard junk
+  state.latencies.push(delta);
+  if (state.latencies.length > 20) state.latencies.shift();
+  const avg = state.latencies.reduce((a, b) => a + b, 0) / state.latencies.length;
+  document.getElementById('stat-latency').textContent = avg.toFixed(1) + 's';
+}
+
+function addDecision(payload, ts) {
+  const hint = decisionsList.querySelector('.empty-hint');
+  if (hint) hint.remove();
+
+  const held = !payload.recipients || payload.recipients.length === 0;
+
+  if (held) {
+    // Held decisions do NOT render a row — they roll into the counter.
+    state.decisions[payload.decision_id] = { row: null, payload, held: true };
+    addHeld(payload, ts);
+  } else {
+    const row = buildRoutedRow(payload, ts);
+    // Newest routed row on top, but keep the held counter/rows pinned below.
+    decisionsList.insertBefore(row, decisionsList.firstChild);
+    state.decisions[payload.decision_id] = { row, payload, held: false };
+
+    payload.recipients.forEach(rid => flashLane(rid));
+  }
+
+  state.decOrder.unshift(payload.decision_id);
+
+  // Cap retained routed rows (~50). Held counter is unbounded but cheap.
+  let routedKept = 0;
+  for (let i = 0; i < state.decOrder.length; i++) {
+    const e = state.decisions[state.decOrder[i]];
+    if (e && !e.held) routedKept++;
+  }
+  while (routedKept > 50) {
+    // Evict the oldest routed decision.
+    for (let i = state.decOrder.length - 1; i >= 0; i--) {
+      const id = state.decOrder[i];
+      const e = state.decisions[id];
+      if (e && !e.held) {
+        if (e.row && e.row.parentNode) e.row.parentNode.removeChild(e.row);
+        delete state.decisions[id];
+        state.decOrder.splice(i, 1);
+        routedKept--;
+        break;
+      }
+    }
+  }
+
+  renderStateTiles();
+}
+
+function applyEvalScore(payload) {
+  const { decision_id, outcome, time_to_action_ms } = payload;
+  const entry = state.decisions[decision_id];
+  // Held decisions render no row — safe to ignore an eval_score for them.
+  if (!entry || entry.held || !entry.row) {
+    // still record latency stat if present
+  } else {
+    const out = entry.row.querySelector('[data-outcome]');
+    if (out) {
+      const [icon, label] = outcomeMark(outcome);
+      out.className = 'dec-outcome ' + (outcome || '');
+      out.textContent = icon;
+      out.title = label;
+    }
+  }
+  if (time_to_action_ms != null) {
+    // (route-latency stat is computed client-side in handleMessage; this keeps
+    //  the eval-provided time_to_action for parity but does not override it.)
+  }
+}
+
+/* ── Improvement curves ─────────────────────────────────────────────────── */
+function drawCurve(canvasId, noDataId, before, after, label) {
+  const canvas = document.getElementById(canvasId);
+  const noData = document.getElementById(noDataId);
+  if (!canvas) return;
+  canvas.style.display = 'block';
+  noData.style.display = 'none';
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 260;
+  const H = 60;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = 12;
+  const xBefore = pad + (W - 2*pad) * 0.3;
+  const xAfter  = pad + (W - 2*pad) * 0.7;
+  const xMid    = (xBefore + xAfter) / 2;
+  const maxVal = Math.max(before, after, 1);
+  const yBefore = pad + (1 - before/maxVal) * (H - 2*pad);
+  const yAfter  = pad + (1 - after/maxVal)  * (H - 2*pad);
+
+  // Baseline grid line — warm muted (matches --surface2 / paper tone).
+  ctx.beginPath(); ctx.strokeStyle = '#d8cdba'; ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]); ctx.moveTo(pad, H/2); ctx.lineTo(W - pad, H/2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Revision marker — together indigo (--warn) at ~60% alpha.
+  ctx.beginPath(); ctx.strokeStyle = '#6a4cf099'; ctx.lineWidth = 2;
+  ctx.setLineDash([2, 3]); ctx.moveTo(xMid, pad); ctx.lineTo(xMid, H - pad); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Curve stroke — signature coral (--accent).
+  ctx.beginPath(); ctx.strokeStyle = '#fc4c02'; ctx.lineWidth = 3;
+  ctx.moveTo(xBefore, yBefore);
+  ctx.bezierCurveTo(xBefore + (xAfter-xBefore)*0.5, yBefore, xBefore + (xAfter-xBefore)*0.5, yAfter, xAfter, yAfter);
+  ctx.stroke();
+
+  // Dots — coral fill, midnight-ink (--border) outline.
+  [[xBefore, yBefore], [xAfter, yAfter]].forEach(([x, y]) => {
+    ctx.fillStyle = '#fc4c02'; ctx.strokeStyle = '#0a0a1f'; ctx.lineWidth = 2;
+    ctx.fillRect(x - 4, y - 4, 8, 8); ctx.strokeRect(x - 4, y - 4, 8, 8);
+  });
+
+  ctx.font = 'bold 10px "Space Mono", monospace';
+  ctx.fillStyle = '#5a5566'; ctx.textAlign = 'center';
+  ctx.fillText('before', xBefore, H - 2); ctx.fillText('after', xAfter, H - 2);
+  ctx.fillStyle = '#0a0a1f'; ctx.textAlign = 'right';
+  ctx.fillText(before.toFixed ? before.toFixed(2) : before, xBefore - 6, yBefore + 4);
+  ctx.textAlign = 'left';
+  ctx.fillText(after.toFixed ? after.toFixed(2) : after, xAfter + 6, yAfter + 4);
+}
+
+// Render Cekura's REAL per-metric judge scores: a pass-rate bar + a collapsible
+// list of per-scenario explanations. Domain-agnostic — metric names, scenarios
+// and text all come straight from the payload. Hidden when there's no data
+// (i.e. local-rubric runs that carry no cekura_metric_scores).
+function renderCekuraScores(scores) {
+  const block = document.getElementById('cekura-scores-block');
+  const host  = document.getElementById('cekura-metric-bars');
+  if (!block || !host) return;
+  if (!Array.isArray(scores) || scores.length === 0) {
+    block.style.display = 'none';
+    return;
+  }
+  host.innerHTML = '';
+  scores.forEach(m => {
+    const name  = m.name != null ? String(m.name) : '';
+    const total = Number(m.total) || 0;
+    const pass  = Number(m.pass_count) || 0;
+    const pct   = (m.pass_pct != null) ? Number(m.pass_pct)
+                : (total > 0 ? (100 * pass / total) : 0);
+    const expls = Array.isArray(m.explanations) ? m.explanations : [];
+
+    const row = document.createElement('div');
+    row.className = 'cekura-metric-row';
+
+    const head = document.createElement('div');
+    head.className = 'cekura-metric-head';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'cekura-metric-name';
+    nameEl.textContent = name;
+    const capEl = document.createElement('span');
+    capEl.className = 'cekura-metric-caption';
+    capEl.textContent = pct.toFixed(0) + '% pass · ' + pass + '/' + total;
+    head.appendChild(nameEl);
+    head.appendChild(capEl);
+    row.appendChild(head);
+
+    const track = document.createElement('div');
+    track.className = 'cekura-bar-track';
+    const fill = document.createElement('div');
+    fill.className = 'cekura-bar-fill';
+    fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    track.appendChild(fill);
+    row.appendChild(track);
+
+    if (expls.length) {
+      const det = document.createElement('details');
+      const sum = document.createElement('summary');
+      sum.textContent = expls.length + ' judge explanation' + (expls.length === 1 ? '' : 's');
+      det.appendChild(sum);
+      const ul = document.createElement('ul');
+      ul.className = 'cekura-expl-list';
+      expls.forEach(e => {
+        const li = document.createElement('li');
+        const scoreNum = Number(e && e.score);
+        if (!isNaN(scoreNum) && scoreNum >= 2.5) li.className = 'pass';
+        const scn = document.createElement('span');
+        scn.className = 'cekura-expl-scn';
+        scn.textContent = (e && e.scenario != null ? String(e.scenario) : '?') + ': ';
+        li.appendChild(scn);
+        li.appendChild(document.createTextNode(e && e.text != null ? String(e.text) : ''));
+        ul.appendChild(li);
+      });
+      det.appendChild(ul);
+      row.appendChild(det);
+    }
+
+    host.appendChild(row);
+  });
+  block.style.display = 'block';
+}
+
+function renderCurves(curves) {
+  if (curves.misroute)       state.curves.misroute       = curves.misroute;
+  if (curves.missed)         state.curves.missed         = curves.missed;
+  if (curves.time_to_action) state.curves.time_to_action = curves.time_to_action;
+
+  if (curves.misroute) drawCurve('curve-misroute', 'nd-misroute', curves.misroute.before, curves.misroute.after);
+  if (curves.missed)   drawCurve('curve-missed', 'nd-missed', curves.missed.before, curves.missed.after);
+  if (curves.time_to_action) drawCurve('curve-tta', 'nd-tta', curves.time_to_action.before, curves.time_to_action.after);
+
+  if (curves.scored_by || curves.optimizer_model) {
+    const block = document.getElementById('scored-by-block');
+    block.style.display = 'block';
+    if (curves.scored_by) document.getElementById('scored-by-text').textContent = curves.scored_by;
+    if (curves.optimizer_model) document.getElementById('optimizer-text').textContent = curves.optimizer_model;
+  }
+  if (curves.cekura_metric_scores) renderCekuraScores(curves.cekura_metric_scores);
+  if (curves.flagged && curves.flagged.length) {
+    const block = document.getElementById('flagged-block');
+    const list  = document.getElementById('flagged-list');
+    list.innerHTML = '';
+    curves.flagged.forEach(f => { const li = document.createElement('li'); li.textContent = f; list.appendChild(li); });
+    block.style.display = 'block';
+  }
+  if (curves.prompt_diff) {
+    const block = document.getElementById('prompt-diff-block');
+    const txt   = document.getElementById('prompt-diff-text');
+    block.style.display = 'block';
+    txt.textContent = curves.prompt_diff;
+  }
+}
+
+function handleCurvesPayload(payload) {
+  const b = payload.before || {};
+  const a = payload.after  || {};
+  renderCurves({
+    misroute:        { before: b.misroute       || 0, after: a.misroute       || 0 },
+    missed:          { before: b.missed         || 0, after: a.missed         || 0 },
+    time_to_action:  { before: b.time_to_action || 0, after: a.time_to_action || 0 },
+    prompt_diff:     payload.prompt_diff || '',
+    scored_by:       payload.scored_by || '',
+    optimizer_model: payload.optimizer_model || '',
+    flagged:         payload.flagged || [],
+    cekura_metric_scores: payload.cekura_metric_scores || [],
+  });
+}
+
+/* ── WebSocket ──────────────────────────────────────────────────────────── */
+const busDot   = document.getElementById('bus-dot');
+const busLabel = document.getElementById('bus-label');
+function setStatus(s) {
+  busDot.className  = 'dot ' + s;
+  busLabel.textContent = s === 'live' ? 'live' : s === 'replay' ? 'replay' : s;
+}
+
+const isReplay = new URLSearchParams(location.search).get('demo') === 'replay';
+// Replay mode is shown by the always-visible bus-status pill (amber "replay").
+
+// Derive ws/wss from the page protocol — browsers block ws:// from an https
+// page (mixed content). Lets the dashboard work behind HTTPS when cloud-hosted.
+const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+let ws, reconnTimer;
+
+function connect() {
+  ws = new WebSocket(wsUrl);
+  ws.onopen = () => { clearTimeout(reconnTimer); setStatus(isReplay ? 'replay' : 'live'); };
+  ws.onclose = () => { setStatus('connecting'); reconnTimer = setTimeout(connect, 2000); };
+  ws.onerror = () => { setStatus('connecting'); };
+  ws.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch(e) { return; }
+    handleMessage(msg);
+  };
+}
+
+/* ── Message dispatcher ─────────────────────────────────────────────────── */
+function handleMessage(msg) {
+  switch (msg.type) {
+
+    case 'init': {
+      state.roles  = msg.roles || [];
+      state.domain = msg.display_name || msg.domain || '';
+      document.getElementById('domain-label').textContent = state.domain;
+      document.title = 'Knotch · ' + state.domain;
+      buildLanes(state.roles);
+      renderStateTiles();
+      break;
+    }
+
+    case 'utterance': {
+      const { participant, text, triage_class } = msg.payload || {};
+      if (!participant || !text) break;
+      const lane = laneMap[participant];
+      if (lane) {
+        lane.speakDot.classList.add('speaking');
+        lane.el.classList.add('speaking');
+        state.speakingCount++;
+        renderStateTiles();
+        syncFocusDot();
+        setTimeout(() => {
+          lane.speakDot.classList.remove('speaking');
+          lane.el.classList.remove('speaking');
+          state.speakingCount = Math.max(0, state.speakingCount - 1);
+          renderStateTiles();
+          syncFocusDot();
+        }, 1800);
+      }
+      if (triage_class) state.classes[participant] = triage_class;
+      // Track this channel's most recent utterance time for route-latency.
+      if (msg.ts != null) state.lastUtteranceTs[participant] = msg.ts;
+      appendBubble(participant, text, 'own', msg.ts);
+      break;
+    }
+
+    case 'routing_decision': {
+      updateLatency(msg.payload || {}, msg.ts);
+      addDecision(msg.payload || {}, msg.ts);
+      break;
+    }
+
+    case 'state_update': {
+      const s = (msg.payload || {}).state || {};
+      updateState(s);
+      break;
+    }
+
+    case 'curves': { handleCurvesPayload(msg.payload || {}); break; }
+
+    case 'eval_score': {
+      applyEvalScore(msg.payload || {});
+      if ((msg.payload || {}).curves) renderCurves(msg.payload.curves);
+      break;
+    }
+
+    case 'turn_event': {
+      const { participant, state: evtState } = msg.payload || {};
+      if (!participant) break;
+      const lane = laneMap[participant];
+      if (!lane) break;
+      if (evtState === 'listening') appendBubble(participant, '… listening', 'turn-tick');
+      else if (evtState === 'dropped_backchannel') appendBubble(participant, '· backchannel dropped', 'turn-tick');
+      break;
+    }
+
+    case 'system': {
+      const p = msg.payload || {};
+      if (p.curves) renderCurves(p.curves);
+      else if (p.before && p.after) handleCurvesPayload(p);
+      break;
+    }
+  }
+}
+
+/* ── Boot ───────────────────────────────────────────────────────────────── */
+connect();
+
+window.addEventListener('resize', () => {
+  if (state.curves.misroute) drawCurve('curve-misroute','nd-misroute', state.curves.misroute.before, state.curves.misroute.after);
+  if (state.curves.missed)   drawCurve('curve-missed','nd-missed',     state.curves.missed.before,   state.curves.missed.after);
+  if (state.curves.time_to_action) drawCurve('curve-tta','nd-tta', state.curves.time_to_action.before, state.curves.time_to_action.after);
+});
+
+})();
+</script>
+</body>
+</html>

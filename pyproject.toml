@@ -1,0 +1,37 @@
+[project]
+name = "knotch"
+version = "0.1.0"
+description = "One-to-many-to-one voice coordination engine (domain-agnostic)"
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+# Core is stdlib + PyYAML only — the offline (CONVENER_LLM=fake) path needs nothing else.
+# Optional groups add real services.
+[project.optional-dependencies]
+dashboard = [
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+]
+llm = [
+    "openai>=1.0",
+]
+redis = [
+    "redis[hiredis]>=5.0",
+]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["engine", "adapters"]

@@ -1,0 +1,22 @@
+# Universal BASE RUBRIC — pre-loaded for every domain.
+#
+# These four metrics are the UNIVERSAL coordination-quality metrics for any
+# one-to-many-to-one routing domain. Every domain inherits them for free via
+# engine/packloader.py, which merges this base with each domain's optional
+# rubric.yaml (domain-specific KPIs only). A domain need not redeclare these.
+metrics:
+  - name: acted_on
+    description: "Did the routed recipient act on the message (did it change their behavior)?"
+    type: binary
+
+  - name: missed
+    description: "Was there an utterance that should have been routed to someone but wasn't?"
+    type: binary
+
+  - name: ignored
+    description: "Was a routed message irrelevant to the recipient (misroute)?"
+    type: binary
+
+  - name: time_to_action
+    description: "ms from a critical utterance to the right recipient receiving the route"
+    type: numeric

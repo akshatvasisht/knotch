@@ -1,0 +1,33 @@
+# agentcontext/ is kept locally and not shipped.
+agentcontext/
+
+# Environment and secrets
+.env
+.starter/server/.env
+.starter/server/pcc.env
+
+# IDE and tooling
+.claude/
+
+# Virtual environments
+.venv/
+**/.venv/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Logs
+*.log
+node_modules/
+uv.lock
+
+# Generated artifacts
+runs/
+**/convener.revised.md
+
+# Domain packs (only _template ships)
+domains/*
+!domains/_template/

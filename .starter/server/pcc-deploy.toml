@@ -1,0 +1,20 @@
+# Pipecat Cloud deploy config for the Convener PARTICIPANT worker.
+# Schema verified against pipecat-ai-cli 1.3.0 (`pipecat cloud deploy --help`)
+# and docs.pipecat.ai/deployment/pipecat-cloud. Keys: agent_name, image,
+# secret_set, [scaling] min_agents/max_agents.
+#
+# Replace <your-dockerhub-username> with your registry user before deploying.
+# Build context is the REPO ROOT (see Dockerfile + deploy_worker.md).
+
+agent_name = "convener-worker"
+# image is set by the Pipecat Cloud managed build (--build-dir / --dockerfile).
+
+# Secret set holding REDIS_URL (Upstash), NVIDIA_ASR_URL, GRADIUM_API_KEY, etc.
+# Uploaded with: pipecat cloud secrets set convener-worker-secrets --file pcc.env
+secret_set = "convener-worker-secrets"
+
+[scaling]
+    # Keep one instance warm so a session can be started immediately for the
+    # demo. Set to 0 to scale-to-zero (cold start on first session).
+    min_agents = 1
+    max_agents = 3
