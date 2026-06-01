@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Convener PARTICIPANT worker — Pipecat Cloud image.
+# Coordinator PARTICIPANT worker — Pipecat Cloud image.
 #
 # IMPORTANT: build context is the REPO ROOT, not .starter/server, because the
 # worker imports the engine from two levels up (engine/, adapters/, domains/,
@@ -12,7 +12,7 @@
 #
 #   docker buildx build --platform=linux/arm64 \
 #     -f .starter/server/Dockerfile \
-#     -t <user>/convener-worker:0.1 --load .
+#     -t <user>/coordinator-worker:0.1 --load .
 #
 # The dailyco/pipecat-base image owns the runner: its /app/app.py discovers
 # /app/bot.py and calls `await bot(runner_args)` once per session. Python 3.12.
@@ -51,9 +51,9 @@ RUN { \
       echo 'from pathlib import Path as _P'; \
       echo '_src = _P(__file__).parent / ".starter" / "server" / "bot.py"'; \
       echo '_s.path.insert(0, str(_src.parent))'; \
-      echo '_spec = _u.spec_from_file_location("convener_bot_impl", _src)'; \
+      echo '_spec = _u.spec_from_file_location("coordinator_bot_impl", _src)'; \
       echo '_mod = _u.module_from_spec(_spec)'; \
-      echo '_s.modules["convener_bot_impl"] = _mod'; \
+      echo '_s.modules["coordinator_bot_impl"] = _mod'; \
       echo '_spec.loader.exec_module(_mod)'; \
       echo 'bot = _mod.bot'; \
     } > /app/bot.py

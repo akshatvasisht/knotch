@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Pipecat Cloud entrypoint for the Convener PARTICIPANT voice worker.
+"""Pipecat Cloud entrypoint for the Coordinator PARTICIPANT voice worker.
 
 This is the *cloud* counterpart of ``worker_daily.py``. It is the file the
 Pipecat Cloud base image (``dailyco/pipecat-base``) discovers and invokes once
@@ -24,30 +24,30 @@ Architectural difference from ``worker_daily.py``:
 
 What stays identical: the per-participant pipeline and the bus splice. The
 deployed worker connects OUT to the SAME Upstash Redis bus (``REDIS_URL``,
-``CONVENER_BUS=redis``) and so joins the SAME distributed fabric as the
-off-cloud convener (``engine.proc_convener``) and any local workers. That is the
-whole point: a cloud-deployed participant + an off-cloud convener, meeting on
+``KNOTCH_BUS=redis``) and so joins the SAME distributed fabric as the
+off-cloud coordinator (``engine.proc_coordinator``) and any local workers. That is the
+whole point: a cloud-deployed participant + an off-cloud coordinator, meeting on
 the bus.
 
 Required cloud env (uploaded as a Pipecat Cloud secret set, NOT baked in):
   REDIS_URL              Upstash rediss:// URL (the shared bus)
-  CONVENER_BUS=redis     select the Redis bus backend
-  CONVENER_DASHBOARD=off the cloud worker must NOT try to host a dashboard
+  KNOTCH_BUS=redis     select the Redis bus backend
+  KNOTCH_DASHBOARD=off the cloud worker must NOT try to host a dashboard
   NVIDIA_ASR_URL         ASR WebSocket endpoint (STT)
-  CONVENER_LLM_URL       used by the off-cloud convener process, harmless here
-  CONVENER_LLM_MODEL     same
+  KNOTCH_LLM_URL       used by the off-cloud coordinator process, harmless here
+  KNOTCH_LLM_MODEL     same
   GRADIUM_API_KEY        TTS (omit -> StubTTS, no audio)
   GRADIUM_VOICE_ID       optional default voice
-  CONVENER_VOICE_TTS     gradium | stub
-  CONVENER_ROLE          which role this agent plays, e.g. role_grill
-  CONVENER_DOMAIN        domain pack, e.g. kitchen
+  KNOTCH_VOICE_TTS     gradium | stub
+  KNOTCH_ROLE          which role this agent plays, e.g. role_grill
+  KNOTCH_DOMAIN        domain pack, e.g. kitchen
   DAILY_API_KEY          NOT needed in cloud (Pipecat Cloud owns the room), but
                          harmless if present.
 
-Role/domain are read from env (CONVENER_ROLE / CONVENER_DOMAIN) because Pipecat
+Role/domain are read from env (KNOTCH_ROLE / KNOTCH_DOMAIN) because Pipecat
 Cloud invokes ``bot(runner_args)`` with no CLI args of our own. Deploy one agent
-per role (e.g. convener-worker-grill, convener-worker-fry) each with its own
-CONVENER_ROLE secret, or pass the role in the session ``body`` (see below).
+per role (e.g. coordinator-worker-grill, coordinator-worker-fry) each with its own
+KNOTCH_ROLE secret, or pass the role in the session ``body`` (see below).
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ from nvidia_stt import NVidiaWebSocketSTTService  # noqa: E402
 from worker_daily import BusBridge, build_tts  # noqa: E402
 
 from adapters import factory  # noqa: E402
-from engine.packloader import load_pack  # noqa: E402
+from engine.domain_loader import load_pack  # noqa: E402
 
 
 def _build_pipeline(transport: DailyTransport, *, role, pack):
@@ -135,7 +135,7 @@ async def bot(runner_args: RunnerArguments) -> None:
     """
     if not isinstance(runner_args, DailyRunnerArguments):
         raise RuntimeError(
-            "convener-worker only supports the Daily transport; got "
+            "coordinator-worker only supports the Daily transport; got "
             f"{type(runner_args).__name__}. Start the session with the Daily "
             "transport on Pipecat Cloud."
         )
@@ -144,12 +144,12 @@ async def bot(runner_args: RunnerArguments) -> None:
     # so this entrypoint stays domain-agnostic (fail loudly if unset, don't
     # silently load one specific domain).
     body = getattr(runner_args, "body", None) or {}
-    role_id = body.get("role") or os.environ.get("CONVENER_ROLE")
-    domain = body.get("domain") or os.environ.get("CONVENER_DOMAIN")
+    role_id = body.get("role") or os.environ.get("KNOTCH_ROLE")
+    domain = body.get("domain") or os.environ.get("KNOTCH_DOMAIN")
     if not role_id or not domain:
         raise SystemExit(
             "bot.py: role/domain not set. Provide them in the session body "
-            "({'role': ..., 'domain': ...}) or via CONVENER_ROLE / CONVENER_DOMAIN."
+            "({'role': ..., 'domain': ...}) or via KNOTCH_ROLE / KNOTCH_DOMAIN."
         )
 
     pack = load_pack(
@@ -164,21 +164,21 @@ async def bot(runner_args: RunnerArguments) -> None:
             f"Known roles: {pack.role_ids}"
         )
 
-    backend = factory._backend("CONVENER_BUS")
+    backend = factory._backend("KNOTCH_BUS")
     logger.info(
         f"Cloud worker up · role={role.role_id} domain={pack.domain} "
         f"bus={backend} voice={role.voice_id or '(default)'}"
     )
     if backend != "redis":
         logger.warning(
-            "CONVENER_BUS != redis — the cloud worker will NOT join the shared "
-            "Upstash bus. Set CONVENER_BUS=redis in the secret set."
+            "KNOTCH_BUS != redis — the cloud worker will NOT join the shared "
+            "Upstash bus. Set KNOTCH_BUS=redis in the secret set."
         )
 
     transport = DailyTransport(
         runner_args.room_url,
         runner_args.token,
-        f"Convener · {role.display_name}",
+        f"Coordinator · {role.display_name}",
         params=DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,

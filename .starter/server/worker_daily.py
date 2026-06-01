@@ -6,18 +6,18 @@
 
 """Daily-transport participant voice worker — ONE process == ONE participant.
 
-This is the distributed, process-per-worker counterpart of ``bot_convener.py``.
-Where bot_convener ran every participant inside ONE process on an in-memory bus,
+This is the distributed, process-per-worker counterpart of ``bot_coordinator.py``.
+Where bot_coordinator ran every participant inside ONE process on an in-memory bus,
 this file runs a SINGLE participant in its OWN process, joins its OWN Daily room,
-and meets the convener + every other participant only on the SHARED Redis bus.
+and meets the coordinator + every other participant only on the SHARED Redis bus.
 
 Daily is a cloud SFU, so there is no NAT to punch: the bot dials out to Daily and
 a human opens the same room URL on a phone and speaks. N=3 == launch three of
 these workers with three roles -> three rooms -> three phones; the separate
-``engine.proc_convener`` process coordinates them over the bus, and
+``engine.proc_coordinator`` process coordinates them over the bus, and
 ``python -m engine.dashboard --domain kitchen --live`` visualises it.
 
-Per-participant pipeline (identical ordering to bot_convener)::
+Per-participant pipeline (identical ordering to bot_coordinator)::
 
     transport.input()
       -> NVidiaWebSocketSTTService(url=NVIDIA_ASR_URL, strip_interim_prefix=True)
@@ -26,7 +26,7 @@ Per-participant pipeline (identical ordering to bot_convener)::
       -> tts                            # Gradium OR a logging stub (env swap)
       -> transport.output()
 
-There is NO convener and NO dashboard in THIS process. The BusBridge:
+There is NO coordinator and NO dashboard in THIS process. The BusBridge:
   * On a finalized TranscriptionFrame: triage -> if routable, publish an
     Utterance Envelope to bus:utterances.
   * On StartFrame: subscribe to bus:routed; for each decision self_select-ed for
@@ -34,11 +34,11 @@ There is NO convener and NO dashboard in THIS process. The BusBridge:
 
 Run (creates its own room, prints the URL the human opens)::
 
-    CONVENER_BUS=redis uv run worker_daily.py --role role_grill --domain kitchen
+    KNOTCH_BUS=redis uv run worker_daily.py --role role_grill --domain kitchen
 
 Run against an existing room::
 
-    CONVENER_BUS=redis uv run worker_daily.py --role role_grill --room https://you.daily.co/abc
+    KNOTCH_BUS=redis uv run worker_daily.py --role role_grill --room https://you.daily.co/abc
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parents[1]
 
 # Secrets (DAILY_API_KEY, REDIS_URL, NVIDIA_ASR_URL, Gradium) live in the repo-root
-# .env; this server's local .env carries the convener/pipeline knobs. Load root
+# .env; this server's local .env carries the coordinator/pipeline knobs. Load root
 # first, then let the server-local .env override any overlapping knobs.
 load_dotenv(_REPO_ROOT / ".env", override=False)
 load_dotenv(_HERE / ".env", override=True)
@@ -102,7 +102,7 @@ from engine.interfaces import (  # noqa: E402
     RoutingDecision,
     Utterance,
 )
-from engine.packloader import load_pack  # noqa: E402
+from engine.domain_loader import load_pack  # noqa: E402
 from engine.routing import self_select  # noqa: E402
 from engine.triage import triage  # noqa: E402
 
@@ -231,7 +231,7 @@ async def _json(resp, text: str) -> dict:
 # --------------------------------------------------------------------------- #
 class StubTTS(FrameProcessor):
     """No-audio TTS stub. On a TTSSpeakFrame, logs the dispatcher line so the
-    full STT -> bus -> convener -> routed -> speak path is observable without a
+    full STT -> bus -> coordinator -> routed -> speak path is observable without a
     Gradium key. All other frames pass through."""
 
     def __init__(self, *, role_id: str, **kwargs):
@@ -247,11 +247,11 @@ class StubTTS(FrameProcessor):
 
 
 def build_tts(role_id: str, voice_id: str):
-    """Return the TTS service for this role, selected by CONVENER_VOICE_TTS (gradium | stub).
+    """Return the TTS service for this role, selected by KNOTCH_VOICE_TTS (gradium | stub).
 
     Defaults to gradium when GRADIUM_API_KEY is set, else stub.
     """
-    choice = os.getenv("CONVENER_VOICE_TTS", "").strip().lower()
+    choice = os.getenv("KNOTCH_VOICE_TTS", "").strip().lower()
     if not choice:
         choice = "gradium" if os.getenv("GRADIUM_API_KEY") else "stub"
 
@@ -270,7 +270,7 @@ def build_tts(role_id: str, voice_id: str):
         )
 
     logger.warning(
-        f"CONVENER_VOICE_TTS='{choice or 'stub'}' — using StubTTS (no audio). "
+        f"KNOTCH_VOICE_TTS='{choice or 'stub'}' — using StubTTS (no audio). "
         f"dispatcher messages for {role_id} will be logged, not spoken."
     )
     return StubTTS(role_id=role_id)
@@ -341,7 +341,7 @@ class BusBridge(FrameProcessor):
         )
 
     async def _consume_routed(self):
-        """Background: for each convener decision addressed to this role, speak it."""
+        """Background: for each coordinator decision addressed to this role, speak it."""
         try:
             async for env in self._bus.subscribe(CHAN_ROUTED):
                 decision = RoutingDecision.from_dict(env.payload)
@@ -372,8 +372,8 @@ class BusBridge(FrameProcessor):
 # The participant worker: one Daily room, one pipeline, one shared-bus splice. #
 # --------------------------------------------------------------------------- #
 async def run_worker(args: argparse.Namespace) -> None:
-    # The shared bus (RedisBus on Upstash when CONVENER_BUS=redis). No convener
-    # here — the separate engine.proc_convener owns that role on the same bus.
+    # The shared bus (RedisBus on Upstash when KNOTCH_BUS=redis). No coordinator
+    # here — the separate engine.proc_coordinator owns that role on the same bus.
     bus = factory.make_bus()
 
     pack = load_pack(
@@ -389,7 +389,7 @@ async def run_worker(args: argparse.Namespace) -> None:
         )
     role_id = role.role_id
     display = role.display_name
-    bot_name = f"Convener · {display}"
+    bot_name = f"Coordinator · {display}"
 
     # --- Daily room + token ------------------------------------------------- #
     if args.room:
@@ -406,7 +406,7 @@ async def run_worker(args: argparse.Namespace) -> None:
     print(f"  OPEN ON PHONE: {room_url}", flush=True)
     print("=" * 72 + "\n", flush=True)
 
-    backend = factory._backend("CONVENER_BUS")
+    backend = factory._backend("KNOTCH_BUS")
     logger.info(
         f"Worker up · role={role_id} domain={pack.domain} bus={backend} "
         f"voice={role.voice_id or '(default)'}"
@@ -432,7 +432,7 @@ async def run_worker(args: argparse.Namespace) -> None:
 
     # The user aggregator hosts SileroVAD + the turn strategy that treats a
     # finalized STT transcript as end-of-turn. No per-participant LLM — the
-    # convener (separate process) is the only reasoning step; this LLM context
+    # coordinator (separate process) is the only reasoning step; this LLM context
     # is unused but required to host VAD + turn strategy.
     context = LLMContext()
     user_aggregator, _assistant_aggregator = LLMContextAggregatorPair(

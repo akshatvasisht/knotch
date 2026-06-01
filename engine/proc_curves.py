@@ -10,7 +10,7 @@ Usage
     python -m engine.proc_curves --file runs/improve_<domain>.json
 
     # to the live dashboard's bus:
-    CONVENER_BUS=redis python -m engine.proc_curves --file runs/improve_<domain>.json
+    KNOTCH_BUS=redis python -m engine.proc_curves --file runs/improve_<domain>.json
 
 Domain-agnostic: no domain literals appear in this file. The payload (including
 the domain label) is read verbatim from the cached file.

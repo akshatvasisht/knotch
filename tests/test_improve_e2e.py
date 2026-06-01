@@ -21,9 +21,9 @@ from engine.bus import InMemoryBus
 from engine.dashboard.app import attach_dashboard
 from engine.envfile import load_env
 from engine.eval_runner import run_eval
-from engine.improve import improve_once
+from engine.optimizer import improve_once
 from engine.interfaces import CHAN_SYSTEM, Envelope, TYPE_EVAL_SCORE
-from engine.packloader import load_pack
+from engine.domain_loader import load_pack
 
 TEST_PORT = 7870
 

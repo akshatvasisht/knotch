@@ -4,16 +4,16 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Convener Agent — multi-participant voice coordination runtime.
+"""Coordinator Agent — multi-participant voice coordination runtime.
 
 One-to-many-to-one. Each connected browser is a single participant with its own
 pipecat pipeline (STT -> BusBridge -> TTS). All BusBridges share ONE module-level
-``InMemoryBus`` and ONE ``ConvenerWorker`` (the central brain), so the convener
+``InMemoryBus`` and ONE ``Coordinator`` (the central brain), so the coordinator
 sees every participant's turns and routes a single derived dispatcher message
 back into the right channels.
 
 Per-participant pipeline (mirrors bot-nemotron.py's SmallWebRTC setup, but with
-NO local LLM — the only LLM hop is the shared convener)::
+NO local LLM — the only LLM hop is the shared coordinator)::
 
     transport.input()
       -> NVidiaWebSocketSTTService(url=NVIDIA_ASR_URL, strip_interim_prefix=True)
@@ -32,14 +32,14 @@ BusBridge (a pipecat FrameProcessor):
     a TTSSpeakFrame DOWNSTREAM so the dispatcher voice speaks into this channel.
   * All other frames pass through.
 
-TTS swap (so the loop runs WITHOUT the Gradium key) via CONVENER_VOICE_TTS:
+TTS swap (so the loop runs WITHOUT the Gradium key) via KNOTCH_VOICE_TTS:
   * "gradium" — GradiumTTSService (needs GRADIUM_API_KEY).
   * "stub"    — StubTTS: logs ``🔊 dispatcher → <role>: <text>`` on a TTSSpeakFrame,
                 no audio. Default is gradium iff GRADIUM_API_KEY is set, else stub.
 
 Run::
 
-    CONVENER_VOICE_TTS=stub uv run bot_convener.py
+    KNOTCH_VOICE_TTS=stub uv run bot_coordinator.py
 """
 
 import asyncio
@@ -83,9 +83,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from adapters.nemotron_llm import NemotronConvenerLLM  # noqa: E402
+from adapters.openai_llm import OpenAICoordinatorLLM  # noqa: E402
 from engine.bus import InMemoryBus  # noqa: E402
-from engine.convener_worker import ConvenerWorker  # noqa: E402
+from engine.coordinator import Coordinator  # noqa: E402
 from engine.interfaces import (  # noqa: E402
     CHAN_ROUTED,
     TYPE_UTTERANCE,
@@ -93,7 +93,7 @@ from engine.interfaces import (  # noqa: E402
     RoutingDecision,
     Utterance,
 )
-from engine.packloader import (  # noqa: E402
+from engine.domain_loader import (  # noqa: E402
     assemble_system_prompt,
     load_pack,
     load_scaffold,
@@ -103,20 +103,20 @@ from engine.triage import triage  # noqa: E402
 
 load_dotenv(override=True)
 
-DOMAIN = os.getenv("CONVENER_DOMAIN", "kitchen")
+DOMAIN = os.getenv("KNOTCH_DOMAIN", "kitchen")
 
 # Dashboard feature flags (read once at import time so they're visible below)
-_DASHBOARD_ENABLED = os.getenv("CONVENER_DASHBOARD", "on").strip().lower() != "off"
-_DASHBOARD_PORT = int(os.getenv("CONVENER_DASHBOARD_PORT", "7861"))
+_DASHBOARD_ENABLED = os.getenv("KNOTCH_DASHBOARD", "on").strip().lower() != "off"
+_DASHBOARD_PORT = int(os.getenv("KNOTCH_DASHBOARD_PORT", "7861"))
 
 
 # --------------------------------------------------------------------------- #
-# Central singletons: one bus + one convener worker, started eagerly on boot.  #
-# Every per-connection BusBridge shares these so the convener sees every       #
+# Central singletons: one bus + one coordinator worker, started eagerly on boot.  #
+# Every per-connection BusBridge shares these so the coordinator sees every       #
 # participant. The dashboard also starts here so it is reachable immediately.  #
 # --------------------------------------------------------------------------- #
 class _Central:
-    """Module-level shared state: the bus, the loaded pack, and the convener."""
+    """Module-level shared state: the bus, the loaded pack, and the coordinator."""
 
     bus: InMemoryBus | None = None
     pack = None
@@ -141,7 +141,7 @@ async def _run_dashboard_safe(bus: InMemoryBus, pack, port: int) -> None:
 
 
 async def ensure_central() -> _Central:
-    """Build the bus + convener exactly once (idempotent, lock-guarded).
+    """Build the bus + coordinator exactly once (idempotent, lock-guarded).
 
     Called eagerly at server startup so the voice signalling endpoint and the
     ops dashboard are both reachable before any browser connects.
@@ -160,8 +160,8 @@ async def ensure_central() -> _Central:
         system_prompt = assemble_system_prompt(scaffold, pack)
 
         bus = InMemoryBus()
-        llm = NemotronConvenerLLM()
-        worker = ConvenerWorker(
+        llm = OpenAICoordinatorLLM()
+        worker = Coordinator(
             bus=bus,
             llm=llm,
             system_prompt=system_prompt,
@@ -181,7 +181,7 @@ async def ensure_central() -> _Central:
             )
 
         logger.info(
-            f"🧠 Convener initialized — domain='{pack.domain}', "
+            f"🧠 Coordinator initialized — domain='{pack.domain}', "
             f"roles={pack.role_ids}, LLM={llm.model} @ {llm.base_url}"
         )
         return _central
@@ -200,7 +200,7 @@ def assign_role() -> str:
 # --------------------------------------------------------------------------- #
 class StubTTS(FrameProcessor):
     """No-audio TTS stub. On a TTSSpeakFrame, logs the dispatcher line so the
-    full STT -> bus -> convener -> routed -> speak path is observable without a
+    full STT -> bus -> coordinator -> routed -> speak path is observable without a
     Gradium key. All other frames pass through."""
 
     def __init__(self, *, role_id: str, **kwargs):
@@ -216,11 +216,11 @@ class StubTTS(FrameProcessor):
 
 
 def build_tts(role_id: str, voice_id: str):
-    """Return the TTS service for this role, selected by CONVENER_VOICE_TTS (gradium | stub).
+    """Return the TTS service for this role, selected by KNOTCH_VOICE_TTS (gradium | stub).
 
     Defaults to gradium when GRADIUM_API_KEY is set, else stub.
     """
-    choice = os.getenv("CONVENER_VOICE_TTS", "").strip().lower()
+    choice = os.getenv("KNOTCH_VOICE_TTS", "").strip().lower()
     if not choice:
         choice = "gradium" if os.getenv("GRADIUM_API_KEY") else "stub"
 
@@ -235,7 +235,7 @@ def build_tts(role_id: str, voice_id: str):
         )
 
     logger.warning(
-        f"CONVENER_VOICE_TTS='{choice or 'stub'}' — using StubTTS (no audio). "
+        f"KNOTCH_VOICE_TTS='{choice or 'stub'}' — using StubTTS (no audio). "
         f"dispatcher messages for {role_id} will be logged, not spoken."
     )
     return StubTTS(role_id=role_id)
@@ -305,7 +305,7 @@ class BusBridge(FrameProcessor):
         )
 
     async def _consume_routed(self):
-        """Background: for each convener decision addressed to this role, speak it."""
+        """Background: for each coordinator decision addressed to this role, speak it."""
         try:
             async for env in self._bus.subscribe(CHAN_ROUTED):
                 decision = RoutingDecision.from_dict(env.payload)
@@ -357,7 +357,7 @@ async def run_participant(
 
     # The user aggregator provides SileroVAD and the turn strategy that treats
     # a finalized STT transcript as end-of-turn. There is no per-participant LLM
-    # in this pipeline — the convener is the only reasoning step. The aggregator
+    # in this pipeline — the coordinator is the only reasoning step. The aggregator
     # is needed to host VAD + turn strategy; its LLM context is unused.
     context = LLMContext()
     user_aggregator, _assistant_aggregator = LLMContextAggregatorPair(
@@ -432,7 +432,7 @@ async def bot(runner_args: RunnerArguments):
             )
         case _:
             logger.error(
-                f"Convener supports SmallWebRTC (browser) only; got {type(runner_args)}"
+                f"Coordinator supports SmallWebRTC (browser) only; got {type(runner_args)}"
             )
             return
 
@@ -445,12 +445,12 @@ if __name__ == "__main__":
     from pipecat.runner.run import _add_lifespan_to_app, app, main
 
     @asynccontextmanager
-    async def _convener_lifespan(_app):
-        """Initialize the shared bus, convener worker, and ops dashboard on startup."""
+    async def _coordinator_lifespan(_app):
+        """Initialize the shared bus, coordinator worker, and ops dashboard on startup."""
         await ensure_central()
-        logger.info("Central singletons ready (bus + convener + dashboard scheduled)")
+        logger.info("Central singletons ready (bus + coordinator + dashboard scheduled)")
         yield
 
-    _add_lifespan_to_app(app, _convener_lifespan)
+    _add_lifespan_to_app(app, _coordinator_lifespan)
 
     main()

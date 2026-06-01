@@ -1,44 +1,13 @@
-# =============================================================================
-# Rubric — rubric.yaml
-# =============================================================================
-# Defines the Cekura custom metrics used to evaluate routing decisions in this
-# domain.  These four metrics are required by the engine and dashboard.
-#
-# You may add domain-specific metrics below the four required ones, but do not
-# remove or rename the required metrics (acted_on, missed, ignored,
-# time_to_action).
-# =============================================================================
+# Domain-specific metrics only. The four universal metrics (acted_on, missed,
+# ignored, time_to_action) are inherited from prompts/base_rubric.yaml.
+# Do not redeclare them here.
 
 metrics:
-  # --- Required metrics (do not remove or rename) --------------------------
-
-  - name: acted_on
-    # Did the routed recipient act on the message — did it change their
-    # behavior in a measurable way?
-    description: "Did the routed recipient act on the message (did it change their behavior)?"
-    type: binary
-
-  - name: missed
-    # Was there an utterance that should have been routed to someone but
-    # the convener held it (false negative)?
-    description: "Was there an utterance that should have been routed to someone but wasn't?"
-    type: binary
-
-  - name: ignored
-    # Was a routed message irrelevant to the recipient — a misroute (false
-    # positive)?
-    description: "Was a routed message irrelevant to the recipient (misroute)?"
-    type: binary
-
-  - name: time_to_action
-    # Milliseconds from a critical utterance being spoken to the right
-    # recipient receiving the dispatcher message.
-    description: "ms from a critical utterance to the right recipient receiving the route"
-    type: numeric
-
-  # --- Optional domain-specific metrics ------------------------------------
-  # TODO: Add any additional metrics that make sense for your domain.
-  # Example:
+  # TODO: Add metrics specific to your domain. Examples:
   # - name: escalation_correct
-  #   description: "Was the urgency level assigned correctly for this signal?"
+  #   description: "Was urgency assigned correctly for this signal?"
+  #   type: binary
+  #
+  # - name: narrow_not_broadcast
+  #   description: "Was a named-owner request routed to one role, not all?"
   #   type: binary

@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# Launch the full distributed Convener stack (one of each) over Upstash Redis.
-#   convener (transport-less)  +  dashboard  +  Daily worker (role_grill)
+# Launch the full distributed Coordinator stack (one of each) over Upstash Redis.
+#   coordinator (transport-less)  +  dashboard  +  Daily worker (role_grill)
 #   +  Twilio worker (role_fryer)  +  cloudflared tunnel  (+ Twilio webhook).
-# Daily + Twilio are different participants on the SAME bus + one convener
+# Daily + Twilio are different participants on the SAME bus + one coordinator
 # = the mixed-transport demo. Re-run any time; it stops the prior stack first.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SERVER="$REPO/.starter/server"
-LOG=/tmp/convener_stack; mkdir -p "$LOG"
+LOG=/tmp/coordinator_stack; mkdir -p "$LOG"
 PIDFILE="$LOG/pids"
 export PATH="$HOME/.local/bin:$PATH"
-export CONVENER_BUS=redis
+export KNOTCH_BUS=redis
 
 "$REPO/scripts/stop_stack.sh" >/dev/null 2>&1
 sleep 2
 : > "$PIDFILE"
 
 cd "$REPO"
-echo "starting convener…"
-nohup env CONVENER_BUS=redis CONVENER_LLM=nemotron python3 -m engine.proc_convener --domain kitchen >"$LOG/convener.log" 2>&1 & echo $! >> "$PIDFILE"
+echo "starting coordinator…"
+nohup env KNOTCH_BUS=redis KNOTCH_LLM=nemotron python3 -m engine.proc_coordinator --domain kitchen >"$LOG/coordinator.log" 2>&1 & echo $! >> "$PIDFILE"
 echo "starting dashboard…"
-nohup env CONVENER_BUS=redis python3 -m engine.dashboard --domain kitchen --live --port 7861 >"$LOG/dashboard.log" 2>&1 & echo $! >> "$PIDFILE"
+nohup env KNOTCH_BUS=redis python3 -m engine.dashboard --domain kitchen --live --port 7861 >"$LOG/dashboard.log" 2>&1 & echo $! >> "$PIDFILE"
 echo "starting cloudflared tunnel…"
 nohup cloudflared tunnel --url http://localhost:7860 >"$LOG/cloudflared.log" 2>&1 & echo $! >> "$PIDFILE"
 sleep 9
@@ -42,10 +42,10 @@ fi
 
 cd "$SERVER"
 echo "starting twilio_worker (role_fryer)…"
-nohup env PATH="$HOME/.local/bin:$PATH" PUBLIC_WSS_URL="$HOST" CONVENER_BUS=redis CONVENER_TWILIO_ROLE=role_fryer \
+nohup env PATH="$HOME/.local/bin:$PATH" PUBLIC_WSS_URL="$HOST" KNOTCH_BUS=redis KNOTCH_TWILIO_ROLE=role_fryer \
   uv run twilio_worker.py >"$LOG/twilio_worker.log" 2>&1 & echo $! >> "$PIDFILE"
 echo "starting worker_daily (role_grill)…"
-nohup env PATH="$HOME/.local/bin:$PATH" CONVENER_BUS=redis \
+nohup env PATH="$HOME/.local/bin:$PATH" KNOTCH_BUS=redis \
   uv run worker_daily.py --role role_grill --domain kitchen >"$LOG/worker_daily.log" 2>&1 & echo $! >> "$PIDFILE"
 
 cd "$REPO"
@@ -54,7 +54,7 @@ ROOM=$(grep -oE "https://[a-z0-9.-]+\.daily\.co/[A-Za-z0-9]+" "$LOG/worker_daily
 echo "${URL:-}" > "$LOG/tunnel_url.txt"; echo "${ROOM:-}" > "$LOG/daily_room.txt"
 cat <<EOF
 
-================= CONVENER STACK UP =================
+================= COORDINATOR STACK UP =================
  Dashboard:   http://localhost:7861
  Daily room:  ${ROOM:-"(see $LOG/worker_daily.log)"}
               ^ open in a browser/phone, allow mic = participant GRILL

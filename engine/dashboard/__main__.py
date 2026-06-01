@@ -12,21 +12,21 @@ from engine.dashboard.app import _replay_mode, attach_dashboard
 async def _live_mode(domain: str, host: str, port: int) -> None:
     from adapters import factory
     from engine.envfile import load_env
-    from engine.packloader import load_pack
+    from engine.domain_loader import load_pack
 
     load_env()
     pack = load_pack(domain)
     bus = factory.make_bus()  # redis or memory, from env
-    print(f"[dashboard] live · domain={domain} bus={factory._backend('CONVENER_BUS')} "
+    print(f"[dashboard] live · domain={domain} bus={factory._backend('KNOTCH_BUS')} "
           f"→ http://localhost:{port}", flush=True)
     await attach_dashboard(bus, pack, host=host, port=port)
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Convener dashboard standalone")
+    p = argparse.ArgumentParser(description="Coordinator dashboard standalone")
     p.add_argument("--domain", default="demo", help="domain pack / label")
     p.add_argument("--live", action="store_true",
-                   help="subscribe to the live bus (CONVENER_BUS from .env)")
+                   help="subscribe to the live bus (KNOTCH_BUS from .env)")
     p.add_argument("--replay", default=None, metavar="FILE.jsonl",
                    help="path to a JSONL event log to replay")
     p.add_argument("--host", default="0.0.0.0")

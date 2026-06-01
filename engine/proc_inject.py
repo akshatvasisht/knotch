@@ -2,7 +2,7 @@
 
 A separate-process substitute for a participant's live input path; useful for
 transcript injection and evaluation replay without a running transport. This
-process publishes, the convener process routes, and the dashboard process
+process publishes, the coordinator process routes, and the dashboard process
 renders — all communicating only through the bus.
 
     python -m engine.proc_inject --domain demo --scenario example_scenario
@@ -24,7 +24,7 @@ import asyncio
 from adapters import factory
 from engine.envfile import load_env
 from engine.interfaces import Envelope, TYPE_UTTERANCE, Utterance
-from engine.packloader import load_pack
+from engine.domain_loader import load_pack
 from engine.triage import triage
 
 
@@ -40,7 +40,7 @@ async def _run_scenarios(
     for scen in scenarios:
         print(
             f"[inject] scenario '{scen.get('id')}' "
-            f"bus={factory._backend('CONVENER_BUS')}",
+            f"bus={factory._backend('KNOTCH_BUS')}",
             flush=True,
         )
         for line in scen.get("utterances", []):

@@ -1,4 +1,4 @@
-"""ConvenerWorker — the brain. One instance per system.
+"""Coordinator — the brain. One instance per system.
 
 Subscribes to every turn-complete utterance on bus:utterances. For each:
   1. Update the shared cross-channel state (a generic key/value surface spanning
@@ -20,7 +20,7 @@ from collections import deque
 from engine.interfaces import (
     Bus,
     CHAN_UTTERANCES,
-    ConvenerLLM,
+    CoordinatorLLM,
     Envelope,
     RoleSpec,
     RoutingDecision,
@@ -33,12 +33,12 @@ from engine.interfaces import (
 from engine.routing import validate_decision
 
 
-class ConvenerWorker:
+class Coordinator:
     def __init__(
         self,
         *,
         bus: Bus,
-        llm: ConvenerLLM,
+        llm: CoordinatorLLM,
         system_prompt: str,
         participants: list[RoleSpec],
         zone: str = "z0",
@@ -49,9 +49,9 @@ class ConvenerWorker:
         self.llm = llm
         self.system_prompt = system_prompt
         # `participants` is the FULL active roster — recipients may be addressed
-        # across zones. `owns` is the partition THIS convener is responsible for
-        # routing (the zone-shard seam: scales to ~100 channels via N conveners,
-        # each owning a zone, sharing state over the same bus).
+        # across zones. `owns` is the partition THIS coordinator is responsible for
+        # routing (the zone-shard seam: designed to shard across N coordinators,
+        # each owning a zone and sharing state over the same bus).
         self.participants = participants
         self.participant_ids = [r.role_id for r in participants]
         self.zone = zone
@@ -63,7 +63,7 @@ class ConvenerWorker:
     async def run(self) -> None:
         async for env in self.bus.subscribe(CHAN_UTTERANCES):
             utt = Utterance.from_dict(env.payload)
-            # Zone sharding: only route utterances from roles this convener owns.
+            # Zone sharding: only route utterances from roles this coordinator owns.
             if utt.participant not in self.owns:
                 continue
             self._update_state(utt)
@@ -83,7 +83,7 @@ class ConvenerWorker:
             except Exception as exc:  # noqa: BLE001 — deliberate catch-all fail-safe
                 raw = None
                 decision = RoutingDecision.held(
-                    utt.participant, rationale=f"convener error: {exc}"
+                    utt.participant, rationale=f"coordinator error: {exc}"
                 )
             else:
                 decision = validate_decision(
@@ -107,7 +107,7 @@ class ConvenerWorker:
 
     def _update_state(self, utt: Utterance) -> None:
         """Update the shared state store, namespaced by zone so multiple
-        convener shards can write to the same bus without key collisions.
+        coordinator shards can write to the same bus without key collisions.
         No domain logic — opaque keys."""
         z = self.zone
         self.state[f"{z}:last_speaker"] = utt.participant

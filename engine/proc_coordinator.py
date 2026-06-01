@@ -1,11 +1,11 @@
-"""Standalone convener process — transport-less, pure Redis subscriber.
+"""Standalone coordinator process — transport-less, pure Redis subscriber.
 
 Runs anywhere that can reach the bus (outbound pub/sub only, no NAT, no transport,
 not a Pipecat Cloud session). Subscribes to utterances on the bus, routes via the
 LLM, publishes decisions back. One process; shard by --zone to scale.
 
-    python -m engine.proc_convener --domain demo          # BUS/LLM from .env
-    CONVENER_BUS=redis CONVENER_LLM=nemotron python -m engine.proc_convener --domain demo
+    python -m engine.proc_coordinator --domain demo          # BUS/LLM from .env
+    KNOTCH_BUS=redis KNOTCH_LLM=nemotron python -m engine.proc_coordinator --domain demo
 """
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ import argparse
 import asyncio
 
 from adapters import factory
-from engine.convener_worker import ConvenerWorker
+from engine.coordinator import Coordinator
 from engine.envfile import load_env
-from engine.packloader import assemble_system_prompt, load_pack, load_scaffold
+from engine.domain_loader import assemble_system_prompt, load_pack, load_scaffold
 
 
 async def amain(args: argparse.Namespace) -> None:
@@ -25,21 +25,21 @@ async def amain(args: argparse.Namespace) -> None:
 
     bus = factory.make_bus()
     llm = factory.make_llm()
-    convener = ConvenerWorker(
+    coordinator = Coordinator(
         bus=bus, llm=llm, system_prompt=system_prompt,
         participants=pack.roles, zone=args.zone, domain=pack.domain,
     )
     print(
-        f"[convener] up · domain={pack.domain} zone={args.zone} "
-        f"bus={factory._backend('CONVENER_BUS')} llm={factory._backend('CONVENER_LLM')} "
-        f"owns={sorted(convener.owns)}",
+        f"[coordinator] up · domain={pack.domain} zone={args.zone} "
+        f"bus={factory._backend('KNOTCH_BUS')} llm={factory._backend('KNOTCH_LLM')} "
+        f"owns={sorted(coordinator.owns)}",
         flush=True,
     )
-    await convener.run()  # runs until killed
+    await coordinator.run()  # runs until killed
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(prog="python -m engine.proc_convener")
+    p = argparse.ArgumentParser(prog="python -m engine.proc_coordinator")
     p.add_argument("--domain", required=True)
     p.add_argument("--zone", default="z0")
     p.add_argument("--domains-dir", default="domains")

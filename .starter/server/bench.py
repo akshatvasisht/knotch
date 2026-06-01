@@ -1,7 +1,7 @@
 """Real end-to-end latency + integration bench (headless, no mic).
 
 Exercises every live leg of the voice->route->voice path:
-  1. Convener LLM (Nemotron-3-Super) routing-decision latency.
+  1. Coordinator LLM (Nemotron-3-Super) routing-decision latency.
   2. Gradium TTS time-to-first-audio (+ full synth) -> real PCM.
   3. Nemotron ASR (STT): feed the synthesized PCM back, measure finalization
      latency + check the transcript (a real TTS->STT loop).
@@ -19,9 +19,9 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 load_dotenv(override=True)
 
-from engine.packloader import load_pack, load_scaffold, assemble_system_prompt  # noqa
+from engine.domain_loader import load_pack, load_scaffold, assemble_system_prompt  # noqa
 from engine.interfaces import RoutingRequest, Utterance  # noqa
-from adapters.nemotron_llm import NemotronConvenerLLM  # noqa
+from adapters.openai_llm import OpenAICoordinatorLLM  # noqa
 
 LINE = "fryer's down, I'm forty seconds behind on the fries"
 GRADIUM_URL = "wss://api.gradium.ai/api/speech/tts"
@@ -35,7 +35,7 @@ async def bench_llm(n=3):
     dd, pd = str(REPO / "domains"), str(REPO / "prompts")
     pack = load_pack("kitchen", domains_dir=dd, prompts_dir=pd)
     sysp = assemble_system_prompt(load_scaffold(prompts_dir=pd), pack)
-    llm = NemotronConvenerLLM()
+    llm = OpenAICoordinatorLLM()
     req = RoutingRequest(
         system_prompt=sysp,
         utterance=Utterance(participant="role_fryer", text=LINE, triage_class="alert"),
@@ -118,7 +118,7 @@ async def bench_stt(pcm48k: bytes):
 
 
 async def main():
-    print("== Convener LLM (Nemotron-3-Super) ==")
+    print("== Coordinator LLM (Nemotron-3-Super) ==")
     llm_lat, decision = await bench_llm()
     print(f"  decision: recipients={decision.get('recipients')} "
           f"signal={decision.get('signal_type')} urgency={decision.get('urgency')}")

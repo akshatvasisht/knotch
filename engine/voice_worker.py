@@ -34,7 +34,7 @@ from engine.interfaces import (
 )
 from engine.routing import self_select
 from engine.triage import triage
-from engine.turn_gate import SimpleTurnGate
+from engine.turn_detector import SimpleTurnGate
 
 
 class VoiceWorker:

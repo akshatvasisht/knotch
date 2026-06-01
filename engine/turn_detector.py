@@ -3,7 +3,7 @@
 `SimpleTurnGate` accumulates interim STT text and emits the complete turn when
 an end-of-turn is signalled (chunk.final). A semantic VAD alternative can be
 swapped in behind the same `feed(...) -> Optional[str]` interface with no engine
-change — only an env flip (CONVENER_TURN=smartturn).
+change — only an env flip (KNOTCH_TURN=smartturn).
 """
 from __future__ import annotations
 
@@ -43,6 +43,6 @@ def make_turn_gate(kind: str = "simple") -> SimpleTurnGate:
     if kind == "simple":
         return SimpleTurnGate()
     raise NotImplementedError(
-        f"turn gate '{kind}' is not available — use CONVENER_TURN=simple. "
+        f"turn gate '{kind}' is not available — use KNOTCH_TURN=simple. "
         "The 'smartturn' option (semantic VAD) is not yet wired."
     )

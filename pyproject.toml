@@ -2,12 +2,13 @@
 name = "knotch"
 version = "0.1.0"
 description = "One-to-many-to-one voice coordination engine (domain-agnostic)"
+license = {file = "LICENSE"}
 requires-python = ">=3.12"
 dependencies = [
     "PyYAML>=6.0",
 ]
 
-# Core is stdlib + PyYAML only — the offline (CONVENER_LLM=fake) path needs nothing else.
+# Core is stdlib + PyYAML only — the offline (KNOTCH_LLM=fake) path needs nothing else.
 # Optional groups add real services.
 [project.optional-dependencies]
 dashboard = [

@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# Offline demo — no API keys, no external services required.
-# Runs the full routing loop on fakes: in-memory bus, scripted utterances, printed TTS.
-#
-# Prerequisites:
-#   pip install -e ".[dashboard]"
-#
-# Then:
-#   bash scripts/demo_local.sh
-#   # dashboard → http://localhost:7861
+# Run the engine on all fake backends for local testing.
+# Requires: pip install -e ".[dashboard]"
 set -euo pipefail
 cd "$(dirname "$0")/.."
 exec env \
-  CONVENER_LLM=fake \
-  CONVENER_STT=fake \
-  CONVENER_TTS=fake \
-  CONVENER_TRANSPORT=fake \
-  CONVENER_BUS=memory \
+  KNOTCH_LLM=fake \
+  KNOTCH_STT=fake \
+  KNOTCH_TTS=fake \
+  KNOTCH_TRANSPORT=fake \
+  KNOTCH_BUS=memory \
   python3 -m engine --domain _template --all-scenarios --dashboard

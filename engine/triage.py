@@ -1,12 +1,12 @@
-"""Triage: the cheap gate before the expensive convener call.
+"""Triage: the cheap gate before the expensive coordinator call.
 
 Two jobs, both domain-agnostic:
-  1. Drop backchannels ("uh huh", "yep", "ok") so they never reach the convener.
+  1. Drop backchannels ("uh huh", "yep", "ok") so they never reach the coordinator.
   2. Tag a coarse, generic class on routable turns (a hint, not a decision — the
-     convener LLM still makes the real call; `signal_type` ultimately comes from
+     coordinator LLM still makes the real call; `signal_type` ultimately comes from
      the domain fragment).
 
-Protects the convener's call frequency and stops routing on filler. Generic
+Protects the coordinator's call frequency and stops routing on filler. Generic
 English cue words are fine here — they are not domain literals. No role names
 appear in this file.
 """

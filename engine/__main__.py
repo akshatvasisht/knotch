@@ -1,12 +1,9 @@
-"""`python -m engine --domain <name>` — terminal demo runner.
+"""`python -m engine --domain <name>` — single-process engine runner.
 
-Wires the full loop on fakes, zero external services:
-  inject scripted utterances -> STT -> turn gate -> triage -> convener (fake LLM)
-  -> bus:routed -> output workers self-select -> dispatcher TTS (printed).
-
-The engine never references any domain; everything domain-specific comes from
-domains/<name>/ via --domain. A terminal renderer subscribes to the bus and
-prints the trace (it is a pure bus subscriber — it never drives behavior).
+Wires all services in one process via the configured backends. The engine never
+references any domain; everything domain-specific comes from domains/<name>/.
+A terminal renderer subscribes to the bus and prints the live trace — it is a
+pure bus subscriber and never drives behavior.
 """
 from __future__ import annotations
 
@@ -16,7 +13,7 @@ import sys
 
 import json
 
-from engine.convener_worker import ConvenerWorker
+from engine.coordinator import Coordinator
 from engine.envfile import load_env
 from engine.interfaces import (
     ALL_CHANNELS,
@@ -27,7 +24,7 @@ from engine.interfaces import (
     TurnEvent,
     Utterance,
 )
-from engine.packloader import assemble_system_prompt, load_pack, load_scaffold
+from engine.domain_loader import assemble_system_prompt, load_pack, load_scaffold
 from engine.voice_worker import VoiceWorker
 from adapters import factory
 
@@ -148,21 +145,21 @@ async def amain(args: argparse.Namespace) -> int:
         return 2
 
     backends = (
-        f"stt={factory._backend('CONVENER_STT')} "
-        f"tts={factory._backend('CONVENER_TTS')} "
-        f"llm={factory._backend('CONVENER_LLM')} "
-        f"bus={factory._backend('CONVENER_BUS')} "
-        f"turn={factory._backend('CONVENER_TURN')}"
+        f"stt={factory._backend('KNOTCH_STT')} "
+        f"tts={factory._backend('KNOTCH_TTS')} "
+        f"llm={factory._backend('KNOTCH_LLM')} "
+        f"bus={factory._backend('KNOTCH_BUS')} "
+        f"turn={factory._backend('KNOTCH_TURN')}"
     )
     print(
-        f"{BOLD}CONVENER{RST} · domain={MAG}{pack.domain}{RST} "
+        f"{BOLD}COORDINATOR{RST} · domain={MAG}{pack.domain}{RST} "
         f"({pack.display_name}) · N={len(pack.roles)} "
         f"[{', '.join(names.values())}]\n{DIM}backends: {backends}{RST}"
     )
 
     bus = factory.make_bus()
     llm = factory.make_llm()
-    convener = ConvenerWorker(
+    coordinator = Coordinator(
         bus=bus, llm=llm, system_prompt=system_prompt,
         participants=pack.roles, domain=pack.domain,
     )
@@ -207,12 +204,12 @@ async def amain(args: argparse.Namespace) -> int:
             )
         )
 
-    tasks.append(asyncio.create_task(convener.run()))
+    tasks.append(asyncio.create_task(coordinator.run()))
     for w in workers:
         tasks.append(asyncio.create_task(w.run()))
     # Let all subscriptions register before driving. Redis SUBSCRIBE has network
     # latency (and no backlog), so give it a real grace; negligible for memory.
-    grace = 0.6 if factory._backend("CONVENER_BUS") == "redis" else 0.05
+    grace = 0.6 if factory._backend("KNOTCH_BUS") == "redis" else 0.05
     await asyncio.sleep(grace)
 
     if args.dashboard:
@@ -232,7 +229,7 @@ async def amain(args: argparse.Namespace) -> int:
     for scenario in scenarios:
         await run_scenario(scenario, transports, args.step_delay)
 
-    # Wait for the convener to finish all in-flight routing before teardown.
+    # Wait for the coordinator to finish all in-flight routing before teardown.
     # The real LLM call has network latency; decisions published after bus.close()
     # would be dropped, so we drain until every published utterance has a decision
     # (routed or held), bounded by a per-utterance time budget.

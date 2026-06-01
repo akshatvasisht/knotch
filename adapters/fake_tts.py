@@ -1,7 +1,11 @@
-"""Fake TTS: prints what the dispatcher would speak — no API key required.
+"""Fake TTS for the in-process development and test harness: prints what the
+dispatcher would speak, no API key required. Not a user-facing path.
 
-The real adapter (Magpie, single dispatcher voice) satisfies the same
-`speak(text, *, role_id, voice_id)` interface.
+The TTSService Protocol is the contract; any implementation satisfies it. Live
+text-to-speech runs in a participant worker under .starter/server/ exposing the
+same `speak(text, *, role_id, voice_id)` interface — the bundled worker selects
+a backend by env var (Gradium when configured, else a logging stub), but the
+engine is agnostic to the provider.
 """
 from __future__ import annotations
 

@@ -3,7 +3,7 @@
 #
 # Architecture:
 #   POST /twiml  →  returns TwiML <Connect><Stream url="wss://$PUBLIC_WSS_URL/ws">
-#   WS   /ws     →  real convener-connected pipeline (STT → BusBridge → TTS)
+#   WS   /ws     →  real coordinator-connected pipeline (STT → BusBridge → TTS)
 #   GET  /health →  simple liveness probe
 #
 # Pipeline per call (mirrors worker_daily.py with Twilio transport instead of Daily):
@@ -15,15 +15,15 @@
 #     → build_tts(role_id, voice_id)    # Gradium or StubTTS
 #     → transport.output()
 #
-# Role: env CONVENER_TWILIO_ROLE (default: role_grill)
-# Bus:  factory.make_bus()  (CONVENER_BUS=redis → RedisBus on Upstash)
+# Role: env KNOTCH_TWILIO_ROLE (default: role_grill)
+# Bus:  factory.make_bus()  (KNOTCH_BUS=redis → RedisBus on Upstash)
 #
 # Usage:
-#   PUBLIC_WSS_URL=<cloudflared-host>  CONVENER_BUS=redis  \
-#   CONVENER_TWILIO_ROLE=role_grill    uv run twilio_worker.py
+#   PUBLIC_WSS_URL=<cloudflared-host>  KNOTCH_BUS=redis  \
+#   KNOTCH_TWILIO_ROLE=role_grill    uv run twilio_worker.py
 #
 # Headless import test (no real call needed):
-#   CONVENER_BUS=redis PUBLIC_WSS_URL=example.trycloudflare.com \
+#   KNOTCH_BUS=redis PUBLIC_WSS_URL=example.trycloudflare.com \
 #   uv run python -c "import twilio_worker"
 #
 
@@ -79,7 +79,7 @@ if str(_REPO_ROOT) not in sys.path:
 # ── engine imports (pipecat-free; live two levels up) ─────────────────────────
 from adapters import factory  # noqa: E402
 from engine.interfaces import Bus  # noqa: E402
-from engine.packloader import load_pack  # noqa: E402
+from engine.domain_loader import load_pack  # noqa: E402
 
 # BusBridge + build_tts — reuse from worker_daily.py (they are module-level there)
 from worker_daily import BusBridge, build_tts  # noqa: E402
@@ -96,8 +96,8 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 NVIDIA_ASR_URL = os.environ["NVIDIA_ASR_URL"]
 
 # The role this Twilio worker represents — one inbound call = one participant.
-CONVENER_TWILIO_ROLE = os.getenv("CONVENER_TWILIO_ROLE", "role_grill")
-CONVENER_DOMAIN = os.getenv("CONVENER_DOMAIN", "kitchen")
+KNOTCH_TWILIO_ROLE = os.getenv("KNOTCH_TWILIO_ROLE", "role_grill")
+KNOTCH_DOMAIN = os.getenv("KNOTCH_DOMAIN", "kitchen")
 
 # Twilio telephony: 8 kHz μ-law
 TWILIO_SAMPLE_RATE = 8000
@@ -115,7 +115,7 @@ def _get_pack():
     global _pack
     if _pack is None:
         _pack = load_pack(
-            CONVENER_DOMAIN,
+            KNOTCH_DOMAIN,
             domains_dir=str(_REPO_ROOT / "domains"),
             prompts_dir=str(_REPO_ROOT / "prompts"),
         )
@@ -128,11 +128,11 @@ def _get_pack():
 
 
 def _get_bus() -> Bus:
-    """Return the shared bus singleton (RedisBus when CONVENER_BUS=redis)."""
+    """Return the shared bus singleton (RedisBus when KNOTCH_BUS=redis)."""
     global _bus
     if _bus is None:
         _bus = factory.make_bus()
-        backend = factory._backend("CONVENER_BUS")
+        backend = factory._backend("KNOTCH_BUS")
         logger.info(f"Bus initialised: backend={backend}")
     return _bus
 
@@ -144,12 +144,12 @@ def _get_bus() -> Bus:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
-    logger.info("Twilio Convener Participant Worker")
+    logger.info("Twilio Coordinator Participant Worker")
     logger.info(f"  Port               : {PORT}")
     logger.info(f"  TwiML endpoint     : POST http://localhost:{PORT}/twiml")
     logger.info(f"  WebSocket endpoint : ws://localhost:{PORT}/ws")
-    logger.info(f"  Role               : {CONVENER_TWILIO_ROLE}")
-    logger.info(f"  Domain             : {CONVENER_DOMAIN}")
+    logger.info(f"  Role               : {KNOTCH_TWILIO_ROLE}")
+    logger.info(f"  Domain             : {KNOTCH_DOMAIN}")
     if PUBLIC_WSS_HOST:
         logger.info(f"  Public WSS host    : {PUBLIC_WSS_HOST}")
     else:
@@ -203,8 +203,8 @@ async def health():
         "status": "ok",
         "port": PORT,
         "public_wss_host": PUBLIC_WSS_HOST or "(unset)",
-        "role": CONVENER_TWILIO_ROLE,
-        "domain": CONVENER_DOMAIN,
+        "role": KNOTCH_TWILIO_ROLE,
+        "domain": KNOTCH_DOMAIN,
     }
 
 
@@ -217,7 +217,7 @@ async def ws_endpoint(websocket: WebSocket):
     """Twilio media-stream WebSocket.
 
     Reads the Twilio 'start' event to get stream_sid/call_sid, then runs the
-    full convener-participant pipeline (STT → BusBridge → TTS) on the Redis bus.
+    full coordinator-participant pipeline (STT → BusBridge → TTS) on the Redis bus.
     """
     await websocket.accept()
     logger.info("Twilio media-stream WebSocket connected")
@@ -281,13 +281,13 @@ async def ws_endpoint(websocket: WebSocket):
     pack = _get_pack()
     bus = _get_bus()
 
-    role_id = CONVENER_TWILIO_ROLE
+    role_id = KNOTCH_TWILIO_ROLE
     role = pack.role(role_id)
     if role is None:
         logger.error(
             f"Role '{role_id}' not found in domain '{pack.domain}'. "
             f"Known roles: {pack.role_ids}. "
-            "Set CONVENER_TWILIO_ROLE to a valid role id."
+            "Set KNOTCH_TWILIO_ROLE to a valid role id."
         )
         await websocket.close()
         return
@@ -305,7 +305,7 @@ async def ws_endpoint(websocket: WebSocket):
     )
 
     # ── User aggregator (SileroVAD + turn strategy) ───────────────────────────
-    # No per-participant LLM — the convener (separate process on the same bus)
+    # No per-participant LLM — the coordinator (separate process on the same bus)
     # is the only reasoning step. The aggregator context is unused but required
     # to host VAD + turn strategy.
     context = LLMContext()
@@ -357,7 +357,7 @@ async def ws_endpoint(websocket: WebSocket):
         await worker.queue_frame(EndFrame())
 
     # ── Run ───────────────────────────────────────────────────────────────────
-    logger.info(f"Starting convener participant pipeline (role={role_id})")
+    logger.info(f"Starting coordinator participant pipeline (role={role_id})")
     await worker.run()
     logger.info(f"Pipeline finished (role={role_id})")
 

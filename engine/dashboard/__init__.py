@@ -1,4 +1,4 @@
-"""Operations dashboard package for the Convener engine.
+"""Operations dashboard package for the Coordinator engine.
 
 Provides attach_dashboard(bus, pack, *, host, port) — a coroutine that:
   - subscribes to ALL bus channels

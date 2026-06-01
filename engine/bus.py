@@ -1,7 +1,7 @@
 """In-memory async pub/sub bus.
 
 Implements the `Bus` Protocol from interfaces.py. A Redis-backed bus satisfies
-the same interface — flip CONVENER_BUS=redis, no engine change needed.
+the same interface — flip KNOTCH_BUS=redis, no engine change needed.
 Channels are the logical topics in interfaces.ALL_CHANNELS.
 
 Design: each `subscribe(channel)` gets its own asyncio.Queue. `publish` fans an

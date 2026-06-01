@@ -6,9 +6,9 @@ Usage
     python -m engine.proc_improve --domain <name>
 
     # with redis bus:
-    CONVENER_BUS=redis python -m engine.proc_improve --domain <name>
+    KNOTCH_BUS=redis python -m engine.proc_improve --domain <name>
 
-    # overwrite the original convener.md with the revised fragment (opt-in):
+    # overwrite the original routing_policy.md with the revised fragment (opt-in):
     python -m engine.proc_improve --domain <name> --apply
 
 Domain-agnostic: no domain literals appear in this file. Everything domain-
@@ -24,9 +24,9 @@ from pathlib import Path
 from adapters import factory
 from engine.envfile import load_env
 from engine.eval_runner import run_eval
-from engine.improve import improve_rounds, optimizer_model_name
+from engine.optimizer import improve_rounds, optimizer_model_name
 from engine.interfaces import Envelope, TYPE_CURVES
-from engine.packloader import load_pack
+from engine.domain_loader import load_pack
 
 
 async def amain(args: argparse.Namespace) -> None:
@@ -43,10 +43,10 @@ async def amain(args: argparse.Namespace) -> None:
     optimizer = optimizer_model_name()
 
     # Select the scoring source. Default is the honest LOCAL rubric scorer;
-    # --cekura opts into the real Cekura-in-loop judge (engine/cekura_score.py).
+    # --cekura opts into the real Cekura-in-loop judge (adapters/cekura_score.py).
     score_source = None
     if args.cekura:
-        from engine.cekura_score import CekuraScoreSource
+        from adapters.cekura_score import CekuraScoreSource
 
         score_source = CekuraScoreSource()
         print(f"[improve] scoring via {score_source.scored_by}", flush=True)
@@ -101,9 +101,9 @@ async def amain(args: argparse.Namespace) -> None:
         for ex in explanations[:3]:
             print(f"  - {ex}", flush=True)
 
-    # ── Optionally apply the revision over the original convener.md ──────────
+    # ── Optionally apply the revision over the original routing_policy.md ──────
     if args.apply:
-        original = Path(pack.path) / "convener.md"
+        original = Path(pack.path) / "routing_policy.md"
         original.write_text(res["revised_fragment"], encoding="utf-8")
         print(f"[improve] --apply: overwrote {original}", flush=True)
 
@@ -165,7 +165,7 @@ def main() -> None:
     p.add_argument(
         "--apply",
         action="store_true",
-        help="Overwrite domains/<domain>/convener.md with the revised fragment "
+        help="Overwrite domains/<domain>/routing_policy.md with the revised fragment "
              "(off by default; the revised sibling is always written regardless).",
     )
     p.add_argument(

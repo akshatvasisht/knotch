@@ -1,12 +1,16 @@
-"""Fake transport: text-injection harness — no API key required.
+"""Fake transport for the in-process development and test harness: a
+text-injection driver, no API key required. Not a user-facing path.
 
 A driver calls `inject(text)` to push a complete turn (or `inject(text,
 final=False)` for an interim fragment) into this participant's input stream;
 `close()` ends the stream. `output(text)` is a no-op (FakeTTS prints instead)
 but exists to satisfy the Transport interface.
 
-The real adapter (DailyTransport, one WebRTC room per participant) satisfies the
-same `input_stream()` / `output()` interface.
+The Transport Protocol is the contract; any implementation satisfies it. Live
+transport runs in a participant worker under .starter/server/ exposing the same
+`input_stream()` / `output()` interface — the bundled workers wire Daily
+(WebRTC) and Twilio (telephony), one participant per worker, but the engine is
+agnostic to the medium.
 """
 from __future__ import annotations
 

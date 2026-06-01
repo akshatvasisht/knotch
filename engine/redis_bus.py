@@ -1,7 +1,7 @@
 """Redis-backed bus — the distributed transport for process-per-worker.
 
 Implements the same `Bus` Protocol as InMemoryBus, so engine code is unchanged:
-flip CONVENER_BUS=redis. Participant workers, the convener, and the dashboard run
+flip KNOTCH_BUS=redis. Participant workers, the coordinator, and the dashboard run
 as separate processes and meet only on this bus (Upstash Redis over TLS).
 
 Wire format: each Envelope is JSON-serialised and PUBLISHed on a channel named

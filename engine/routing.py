@@ -1,6 +1,6 @@
 """RoutingDecision validation + output-worker self-select.
 
-Domain-agnostic. The convener LLM emits a raw dict; `validate_decision` coerces
+Domain-agnostic. The coordinator LLM emits a raw dict; `validate_decision` coerces
 it into a safe, contract-valid RoutingDecision (fail-safe to no-route). Output
 workers call `self_select` — a cheap deterministic address match, not an LLM
 call.

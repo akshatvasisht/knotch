@@ -1,4 +1,4 @@
-"""Frozen contracts for the Convener engine — the single source of truth.
+"""Frozen contracts for the Coordinator engine — the single source of truth.
 
 Everything domain-agnostic. No domain literal (a specific domain's role names,
 station names, or signal vocabulary) may ever appear in this file or anywhere
@@ -11,7 +11,7 @@ This module defines:
     TurnEvent.
   - Domain-pack value objects: RoleSpec, DomainPack.
   - Service Protocols every adapter (fake or real) implements: Bus, Transport,
-    STTService, TTSService, ConvenerLLM. Fakes and real services are
+    STTService, TTSService, CoordinatorLLM. Fakes and real services are
     interchangeable — selected by env var via adapters/factory.py.
 
 All payloads are plain dataclasses with `to_dict`/`from_dict` so the bus can
@@ -28,9 +28,9 @@ from typing import Any, AsyncIterator, Optional, Protocol, runtime_checkable
 # --------------------------------------------------------------------------- #
 # Bus channels: two logical topics carry the live path                        #
 # --------------------------------------------------------------------------- #
-CHAN_UTTERANCES = "bus:utterances"   # turn-complete, triaged utterances (input -> convener)
-CHAN_ROUTED = "bus:routed"           # the convener's ONE enriched addressed decision
-CHAN_STATE = "bus:state"             # shared-state updates (convener -> dashboard)
+CHAN_UTTERANCES = "bus:utterances"   # turn-complete, triaged utterances (input -> coordinator)
+CHAN_ROUTED = "bus:routed"           # the coordinator's ONE enriched addressed decision
+CHAN_STATE = "bus:state"             # shared-state updates (coordinator -> dashboard)
 CHAN_EVAL = "bus:eval"               # eval scores (eval_runner -> dashboard)
 CHAN_SYSTEM = "bus:system"           # lifecycle / system messages
 CHAN_TURN = "bus:turn"               # optional turn_event ticks (dashboard-only)
@@ -70,17 +70,17 @@ TYPE_TO_CHANNEL = {
 # --------------------------------------------------------------------------- #
 # Env var names (adapters/factory.py reads these to pick fake vs real)        #
 # --------------------------------------------------------------------------- #
-ENV_STT = "CONVENER_STT"              # fake | nvidia
-ENV_TTS = "CONVENER_TTS"              # fake | nvidia
-ENV_LLM = "CONVENER_LLM"              # fake | nemotron
-ENV_TRANSPORT = "CONVENER_TRANSPORT"  # fake | daily
-ENV_BUS = "CONVENER_BUS"              # memory | redis
-ENV_TURN = "CONVENER_TURN"            # simple | smartturn
+ENV_STT = "KNOTCH_STT"              # fake | nvidia
+ENV_TTS = "KNOTCH_TTS"              # fake | nvidia
+ENV_LLM = "KNOTCH_LLM"              # fake | nemotron
+ENV_TRANSPORT = "KNOTCH_TRANSPORT"  # fake | daily
+ENV_BUS = "KNOTCH_BUS"              # memory | redis
+ENV_TURN = "KNOTCH_TURN"            # simple | smartturn
 
 DEFAULT_BACKEND = {
     ENV_STT: "fake",
     ENV_TTS: "fake",
-    ENV_LLM: "nemotron",   # the REAL convener brain by default (public URL, no key)
+    ENV_LLM: "nemotron",   # the REAL coordinator brain by default (public URL, no key)
     ENV_TRANSPORT: "fake",
     ENV_BUS: "memory",
     ENV_TURN: "simple",
@@ -149,7 +149,7 @@ URGENCY_VALUES = ("low", "med", "high")
 
 @dataclass
 class RoutingDecision:
-    """The convener's only output. Validate before publishing."""
+    """The coordinator's only output. Validate before publishing."""
 
     source: str                         # who spoke (role_id)
     recipients: list[str]               # [] is valid + common = "held, not relevant"
@@ -184,7 +184,7 @@ class RoutingDecision:
 
 @dataclass
 class StateUpdate:
-    """A snapshot of the convener's shared state, broadcast to all subscribers (e.g. dashboard)."""
+    """A snapshot of the coordinator's shared state, broadcast to all subscribers (e.g. dashboard)."""
 
     state: dict
 
@@ -241,7 +241,7 @@ class RoleSpec:
     role_id: str
     display_name: str
     voice_id: str = ""
-    # Partition key for sharding: each convener instance owns the roles in one zone.
+    # Partition key for sharding: each coordinator instance owns the roles in one zone.
     # Default "z0" is correct for single-zone deployments.
     zone_id: str = "z0"
 
@@ -254,7 +254,7 @@ class DomainPack:
     display_name: str
     dispatcher_voice_id: str
     roles: list[RoleSpec]
-    convener_fragment: str            # the .md fragment CONTENT (already read)
+    routing_policy: str            # the .md fragment CONTENT (already read)
     rubric: dict = field(default_factory=dict)
     scenarios: list[dict] = field(default_factory=list)
     path: str = ""                    # source dir, for debugging
@@ -268,13 +268,13 @@ class DomainPack:
 
 
 # --------------------------------------------------------------------------- #
-# Request object handed to the convener LLM. Keeps real + fake call           #
+# Request object handed to the coordinator LLM. Keeps real + fake call           #
 # signatures identical: real adapter serialises this into a prompt; fake      #
 # adapter reads its structured fields.                                         #
 # --------------------------------------------------------------------------- #
 @dataclass
 class RoutingRequest:
-    system_prompt: str                # convener_scaffold + domain fragment, assembled
+    system_prompt: str                # routing_scaffold + domain fragment, assembled
     utterance: Utterance              # the current turn to route
     state: dict                       # shared cross-channel state snapshot
     recent: list[Utterance]           # recent context window (oldest -> newest)
@@ -343,7 +343,7 @@ class TTSService(Protocol):
 
 
 @runtime_checkable
-class ConvenerLLM(Protocol):
+class CoordinatorLLM(Protocol):
     """The routing brain. One call per routable turn. Returns a raw decision
     dict (validated by routing.validate_decision). Fake = deterministic rules;
     real = any OpenAI-compatible LLM via `request.system_prompt`."""

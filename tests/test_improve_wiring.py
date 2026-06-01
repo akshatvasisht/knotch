@@ -32,7 +32,7 @@ FAKE_PACK = DomainPack(
     display_name="Wiring Test",
     dispatcher_voice_id="",
     roles=[RoleSpec(role_id="r1", display_name="Role One")],
-    convener_fragment="",
+    routing_policy="",
 )
 
 TEST_PORT = 7869   # distinct port to avoid clashing with a live dashboard

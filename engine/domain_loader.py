@@ -24,8 +24,8 @@ def load_pack(
     domains_dir: str = "domains",
     prompts_dir: str = "prompts",
 ) -> DomainPack:
-    """Read domains/<domain>/pack.yaml, resolve and READ the convener_fragment
-    file (its .md text becomes DomainPack.convener_fragment), load rubric.yaml
+    """Read domains/<domain>/pack.yaml, resolve and READ the routing_policy
+    file (its .md text becomes DomainPack.routing_policy), load rubric.yaml
     and scenarios.yaml.
 
     Validation:
@@ -89,16 +89,16 @@ def load_pack(
             )
         )
 
-    # --- convener fragment (.md) ------------------------------------------ #
-    fragment_ref: str = raw.get("convener_fragment", "convener.md")
+    # --- coordinator fragment (.md) ------------------------------------------ #
+    fragment_ref: str = raw.get("routing_policy", "routing_policy.md")
     fragment_path = domain_dir / fragment_ref
     if not fragment_path.is_file():
         raise ValueError(
-            f"Domain '{domain}': convener fragment file not found: "
+            f"Domain '{domain}': coordinator fragment file not found: "
             f"'{fragment_path.resolve()}'. "
-            f"(pack.yaml convener_fragment = '{fragment_ref}')"
+            f"(pack.yaml routing_policy = '{fragment_ref}')"
         )
-    convener_fragment: str = fragment_path.read_text(encoding="utf-8")
+    routing_policy: str = fragment_path.read_text(encoding="utf-8")
 
     # --- rubric.yaml (base + optional domain extension) -------------------- #
     # Every domain inherits the universal BASE RUBRIC (prompts/base_rubric.yaml).
@@ -131,7 +131,7 @@ def load_pack(
         display_name=raw["display_name"],
         dispatcher_voice_id=raw["dispatcher_voice_id"],
         roles=roles,
-        convener_fragment=convener_fragment,
+        routing_policy=routing_policy,
         rubric=rubric,
         scenarios=scenarios,
         path=str(domain_dir.resolve()),
@@ -139,24 +139,24 @@ def load_pack(
 
 
 def load_scaffold(prompts_dir: str = "prompts") -> str:
-    """Read and return prompts/convener_scaffold.md as text."""
-    scaffold_path = Path(prompts_dir) / "convener_scaffold.md"
+    """Read and return prompts/routing_scaffold.md as text."""
+    scaffold_path = Path(prompts_dir) / "routing_scaffold.md"
     if not scaffold_path.is_file():
         raise ValueError(
             f"Scaffold file not found: '{scaffold_path.resolve()}'. "
-            f"Expected prompts/convener_scaffold.md relative to the working directory."
+            f"Expected prompts/routing_scaffold.md relative to the working directory."
         )
     return scaffold_path.read_text(encoding="utf-8")
 
 
 def assemble_system_prompt(scaffold: str, pack: DomainPack) -> str:
-    """Return scaffold text + a separator + pack.convener_fragment.
+    """Return scaffold text + a separator + pack.routing_policy.
 
-    This is the convener's full system prompt. Generic only — no domain
-    literals appear here; all domain knowledge is inside pack.convener_fragment.
+    This is the coordinator's full system prompt. Generic only — no domain
+    literals appear here; all domain knowledge is inside pack.routing_policy.
     """
     separator = "\n\n---\n\n"
-    return scaffold + separator + pack.convener_fragment
+    return scaffold + separator + pack.routing_policy
 
 
 # --------------------------------------------------------------------------- #

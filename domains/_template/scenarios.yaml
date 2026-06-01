@@ -1,63 +1,45 @@
-# =============================================================================
-# Scenarios — scenarios.yaml
-# =============================================================================
-# Defines evaluation and demo scenarios for this domain.  Each scenario is a
-# scripted sequence of utterances (participant + text) paired with expected
-# routing outcomes (expect).
-#
-# The packloader stores this list in DomainPack.scenarios.
-# The eval runner replays utterances and compares actual routing decisions to
-# the expect list to compute the rubric metrics.
+# One expect entry per utterance, in the same order as the utterances list.
+# The eval runner matches them positionally.
 #
 # Schema:
-#   scenarios:           (top-level key — required)
-#     - id: <string>     unique scenario identifier
-#       utterances:      list of { participant: <role_id>, text: <string> }
-#       expect:          list of { route_to: <role_id or []>, about: <role_id or label>, signal: <signal_type or "held"> }
+#   scenarios:
+#     - id: <string>
+#       utterances: [ { participant: <role_id>, text: <string> } ]
+#       expect:     [ { route_to: <role_id or []>, about: <role_id>, signal: <signal_type or "held"> } ]
 #
-# Tips:
-# - Include at least one scenario where the correct answer is to HOLD all
-#   utterances (recipients: []).  This tests the "minimize misroutes" metric.
-# - Mix signal types across scenarios.
-# - Use only role_ids defined in pack.yaml as participant values.
-# =============================================================================
+#   route_to: role_id to receive the routed message, or [] for a held decision.
+#   about:    role_id the message concerns (normally the speaker).
+#   signal:   signal_type from routing_policy.md, or "held" when route_to is [].
+#
+# KNOTCH_LLM=fake is keyword-driven: urgency cues (down, stuck, now, help, ...)
+# broadcast; question/"need"/"where" phrasing routes as request; a display_name
+# in the text routes narrowly to that role; everything else is held. Include
+# at least one all-held scenario to test the misroute rate.
 
 scenarios:
 
-  # -------------------------------------------------------------------------
-  # Scenario 1 — TODO: Replace with a realistic routing scenario.
-  # Name it to describe the operational situation (e.g., "station_a_blocked").
-  # -------------------------------------------------------------------------
+  # TODO: Replace with a realistic routing scenario for your domain.
   - id: example_routing_scenario
     utterances:
-      # TODO: Replace with realistic utterances for your domain.
-      - { participant: role_a, text: "I'm backed up and need help from role_b" }
+      - { participant: role_a, text: "I'm stuck and need help right now" }
       - { participant: role_b, text: "on it" }
     expect:
-      # role_a's utterance should route to role_b as a dependency signal
       - { route_to: role_b, about: role_a, signal: dependency }
-      # role_b's "on it" is a backchannel and must be held
       - { route_to: [],     about: role_b, signal: held }
 
-  # -------------------------------------------------------------------------
-  # Scenario 2 — TODO: Replace with a scenario that tests the "held" path.
-  # All utterances in this scenario should be held (no routing).
-  # -------------------------------------------------------------------------
+  # TODO: Replace with chatter/backchannels that should all be held.
   - id: all_chatter_no_routes
     utterances:
-      # TODO: Replace with utterances that are self-contained chatter.
-      - { participant: role_a, text: "quiet day today" }
-      - { participant: role_b, text: "yeah, nothing going on" }
+      - { participant: role_a, text: "quiet stretch, nothing flagged" }
+      - { participant: role_b, text: "yeah, all clear here" }
     expect:
-      # Both utterances are chatter — all held
       - { route_to: [], about: role_a, signal: held }
       - { route_to: [], about: role_b, signal: held }
 
-  # -------------------------------------------------------------------------
-  # Scenario 3 — TODO: Add a third scenario.  Aim for a mix of signal types.
-  # -------------------------------------------------------------------------
-  # - id: another_scenario
+  # TODO: Add a named-owner request: use a display_name in the utterance text
+  # so KNOTCH_LLM=fake routes narrowly to that role.
+  # - id: named_owner_request
   #   utterances:
-  #     - { participant: role_a, text: "..." }
+  #     - { participant: role_a, text: "Role B, where are we on the handoff?" }
   #   expect:
   #     - { route_to: role_b, about: role_a, signal: request }

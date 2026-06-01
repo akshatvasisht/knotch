@@ -1,12 +1,12 @@
-"""Real convener brain: any OpenAI-compatible vLLM endpoint.
+"""Real coordinator brain: any OpenAI-compatible vLLM endpoint.
 
-Implements the same `ConvenerLLM.decide(request) -> dict` interface as the fake,
-so the engine never changes — flip CONVENER_LLM=nemotron. The
-endpoint + model come from env (CONVENER_LLM_URL / CONVENER_LLM_MODEL).
+Implements the same `CoordinatorLLM.decide(request) -> dict` interface as the fake,
+so the engine never changes — flip KNOTCH_LLM=nemotron. The
+endpoint + model come from env (KNOTCH_LLM_URL / KNOTCH_LLM_MODEL).
 
 One plain async OpenAI client call per routable turn. Thinking is disabled for
 low latency. Responses are parsed defensively; any error propagates so the
-convener fail-safes to no-route.
+coordinator fail-safes to no-route.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import json
 import os
 import re
 
-from engine.interfaces import ConvenerLLM, RoleSpec, RoutingRequest, Utterance
+from engine.interfaces import CoordinatorLLM, RoleSpec, RoutingRequest, Utterance
 
 # Endpoints come from the environment (.env), never hardcoded.
 DEFAULT_LLM_MODEL = ""
@@ -22,7 +22,7 @@ DEFAULT_LLM_MODEL = ""
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
-class NemotronConvenerLLM(ConvenerLLM):
+class OpenAICoordinatorLLM(CoordinatorLLM):
     def __init__(
         self,
         *,
@@ -36,19 +36,19 @@ class NemotronConvenerLLM(ConvenerLLM):
         # adapter is actually selected.
         from openai import AsyncOpenAI
 
-        self.base_url = base_url or os.getenv("CONVENER_LLM_URL")
+        self.base_url = base_url or os.getenv("KNOTCH_LLM_URL")
         if not self.base_url:
             raise RuntimeError(
-                "CONVENER_LLM_URL is not set. Provide it via .env — "
+                "KNOTCH_LLM_URL is not set. Provide it via .env — "
                 "endpoints are never hardcoded."
             )
-        self.model = model or os.getenv("CONVENER_LLM_MODEL") or DEFAULT_LLM_MODEL
+        self.model = model or os.getenv("KNOTCH_LLM_MODEL") or DEFAULT_LLM_MODEL
         if not self.model:
             raise RuntimeError(
-                "CONVENER_LLM_MODEL is not set. Provide it via .env."
+                "KNOTCH_LLM_MODEL is not set. Provide it via .env."
             )
         self.enable_thinking = (
-            os.getenv("CONVENER_LLM_THINKING", str(enable_thinking)).lower() == "true"
+            os.getenv("KNOTCH_LLM_THINKING", str(enable_thinking)).lower() == "true"
         )
         self._client = AsyncOpenAI(
             base_url=self.base_url, api_key=api_key, timeout=timeout

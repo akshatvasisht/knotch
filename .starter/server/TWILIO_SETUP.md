@@ -2,7 +2,7 @@
 
 This is a standalone smoke-test for the Twilio → pipecat media-stream channel.
 It proves the webhook → TwiML → WebSocket → pipecat transport plumbing works
-**before** wiring the real convener worker into it.
+**before** wiring the real coordinator worker into it.
 
 ---
 
@@ -124,10 +124,10 @@ chmod +x ~/.local/bin/cloudflared
 
 ---
 
-## Integration note — swapping in the real convener worker
+## Integration note — swapping in the real coordinator worker
 
 When Step 4 is clear, replace the `Pipeline` block inside `ws_endpoint()` in
-`twilio_echo.py` with the same `run_participant()` function used by `bot_convener.py`,
+`twilio_echo.py` with the same `run_participant()` function used by `bot_coordinator.py`,
 passing the `FastAPIWebsocketTransport` instead of the existing `SmallWebRTCTransport`.
 The only diff is the transport constructor and the 8 kHz sample rates (`audio_in_sample_rate=8000`,
 `audio_out_sample_rate=8000` in both `FastAPIWebsocketParams` and `PipelineParams`).

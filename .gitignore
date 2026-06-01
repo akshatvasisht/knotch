@@ -26,7 +26,7 @@ uv.lock
 
 # Generated artifacts
 runs/
-**/convener.revised.md
+**/routing_policy.revised.md
 
 # Domain packs (only _template ships)
 domains/*

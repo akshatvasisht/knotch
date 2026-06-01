@@ -1,4 +1,4 @@
-"""FastAPI + WebSocket dashboard server for the Convener engine.
+"""FastAPI + WebSocket dashboard server for the Coordinator engine.
 
 Public surface
 --------------
@@ -202,7 +202,7 @@ async def _replay_mode(
         display_name=domain.replace("_", " ").title(),
         dispatcher_voice_id="",
         roles=fake_roles,
-        convener_fragment="",
+        routing_policy="",
     )
 
     manager = _ConnectionManager()
@@ -224,12 +224,12 @@ async def _replay_mode(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Convener dashboard standalone / replay")
+    parser = argparse.ArgumentParser(description="Coordinator dashboard standalone / replay")
     parser.add_argument("--domain", default="demo", help="Domain label")
     parser.add_argument("--replay", default=None, metavar="FILE.jsonl",
                         help="Path to a JSONL event log to replay")
     parser.add_argument("--live", action="store_true",
-                        help="Connect to the live bus (honours CONVENER_BUS env var)")
+                        help="Connect to the live bus (honours KNOTCH_BUS env var)")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=7861)
     args = parser.parse_args()
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         asyncio.run(_replay_mode(args.domain, args.replay, args.host, args.port))
     elif args.live:
         import engine.envfile as _envfile
-        import engine.packloader as _packloader
+        import engine.domain_loader as _packloader
         import adapters.factory as _factory
 
         _envfile.load_env()

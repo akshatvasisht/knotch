@@ -1,7 +1,7 @@
-"""Fake convener LLM: deterministic, rule-based routing — no API key required.
+"""Fake coordinator LLM: deterministic, rule-based routing — no API key required.
 
 Implements the same `decide(request) -> dict` interface as the real LLM adapter. Reads the structured RoutingRequest (utterance, triage class, active
-participants) and returns a raw RoutingDecision dict that the convener validates.
+participants) and returns a raw RoutingDecision dict that the coordinator validates.
 Deterministic so tests are reproducible.
 
 Intentionally simple: proves the topology and produces a watchable terminal demo
@@ -10,7 +10,7 @@ Uses generic English cues only — no domain literals.
 """
 from __future__ import annotations
 
-from engine.interfaces import ConvenerLLM, RoutingRequest
+from engine.interfaces import CoordinatorLLM, RoutingRequest
 
 # Generic dependency/alert cues — same spirit as triage, used to pick urgency.
 _HIGH_CUES = (
@@ -20,7 +20,7 @@ _HIGH_CUES = (
 _MED_CUES = ("need", "where", "can ", "could ", "ready", "how long", "?")
 
 
-class FakeConvenerLLM(ConvenerLLM):
+class FakeCoordinatorLLM(CoordinatorLLM):
     async def decide(self, request: RoutingRequest) -> dict:
         utt = request.utterance
         source = utt.participant

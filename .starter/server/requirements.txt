@@ -1,4 +1,4 @@
-# Convener participant worker — Pipecat Cloud image deps.
+# Coordinator participant worker — Pipecat Cloud image deps.
 # Mirrors .starter/server/pyproject.toml. Pinned floors only; the base image
 # already provides a compatible Python 3.12 + pipecat runtime, but we install
 # the extras the worker actually imports so the build is self-contained.

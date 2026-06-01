@@ -1,7 +1,7 @@
 """Autonomous improvement loop — one eval-reflect-eval cycle.
 
 This is the self-improvement keystone of the platform. It is fully
-domain-agnostic: everything domain-specific (the rubric, the convener
+domain-agnostic: everything domain-specific (the rubric, the coordinator
 fragment, the scenarios) arrives via the loaded ``pack``. No domain literal
 appears in this file — the generality gate enforces it.
 
@@ -14,15 +14,15 @@ Public API::
       "before":           {"misroute": float, "missed": float, "time_to_action": float},
       "after":            {"misroute": float, "missed": float, "time_to_action": float},
       "prompt_diff":      str,    # human-readable unified-ish diff (old -> new)
-      "revised_fragment": str,    # the new convener fragment text
-      "revised_path":     str,    # domains/<domain>/convener.revised.md (sibling)
+      "revised_fragment": str,    # the new coordinator fragment text
+      "revised_path":     str,    # domains/<domain>/routing_policy.revised.md (sibling)
       "scored_by":        str,    # honest label of WHAT scored the cycle
       "optimizer_model":  str,    # which model rewrote the fragment
     }
 
 The cycle:
   1. Score the ACTIVE domain against ITS OWN rubric (loaded via pack.rubric).
-  2. Reflect on the failures and rewrite the ACTIVE domain's convener config.
+  2. Reflect on the failures and rewrite the ACTIVE domain's coordinator config.
   3. Re-test with the revised fragment in-process (hot reload, no restart).
   4. Return before/after curves + a per-domain diff for the dashboard.
 
@@ -173,27 +173,27 @@ DEFAULT_OPTIMIZER_MODEL = "llm"
 
 
 def optimizer_model_name() -> str:
-    """The model identifier used for policy optimization (reads CONVENER_LLM_MODEL)."""
-    return os.getenv("CONVENER_LLM_MODEL", DEFAULT_OPTIMIZER_MODEL)
+    """The model identifier used for policy optimization (reads KNOTCH_LLM_MODEL)."""
+    return os.getenv("KNOTCH_LLM_MODEL", DEFAULT_OPTIMIZER_MODEL)
 
 
 async def optimizer_complete(system: str, user: str, *, model: Optional[str] = None) -> str:
     """Run one reflection completion on the configured LLM endpoint.
 
-    Uses the same CONVENER_LLM_URL / CONVENER_LLM_MODEL env vars as the routing
+    Uses the same KNOTCH_LLM_URL / KNOTCH_LLM_MODEL env vars as the routing
     adapter. `model` is accepted for call-site compatibility but ignored.
     """
     from openai import AsyncOpenAI
 
-    base_url = os.getenv("CONVENER_LLM_URL")
+    base_url = os.getenv("KNOTCH_LLM_URL")
     if not base_url:
         raise RuntimeError(
-            "CONVENER_LLM_URL is not set. Provide it via .env — endpoints are "
+            "KNOTCH_LLM_URL is not set. Provide it via .env — endpoints are "
             "never hardcoded."
         )
-    llm_model = os.getenv("CONVENER_LLM_MODEL")
+    llm_model = os.getenv("KNOTCH_LLM_MODEL")
     if not llm_model:
-        raise RuntimeError("CONVENER_LLM_MODEL is not set. Provide it via .env.")
+        raise RuntimeError("KNOTCH_LLM_MODEL is not set. Provide it via .env.")
     client = AsyncOpenAI(base_url=base_url, api_key="EMPTY", timeout=60.0)
     resp = await client.chat.completions.create(
         model=llm_model,
@@ -229,13 +229,13 @@ async def reflect(
     feedback: list[str],
     model: Optional[str] = None,
 ) -> str:
-    """Reflect on failures and return a revised convener fragment (markdown).
+    """Reflect on failures and return a revised coordinator fragment (markdown).
 
     This is the single, pure-ish reflection seam. Inputs:
-      * ``fragment``  — the active domain's current convener config (markdown).
+      * ``fragment``  — the active domain's current coordinator config (markdown).
       * ``failures``  — the failing, scored cases (per-decision dicts).
       * ``feedback``  — one rubric-citing textual string per failure.
-      * ``model``     — accepted for compatibility; ignored (uses CONVENER_LLM_MODEL).
+      * ``model``     — accepted for compatibility; ignored (uses KNOTCH_LLM_MODEL).
 
     Output: a revised fragment string, ready to use verbatim as the new config.
 
@@ -248,7 +248,7 @@ async def reflect(
     )
     system = "You are a prompt engineer. Output only the revised markdown fragment."
     user = (
-        "You are improving a routing-convener prompt fragment for one domain.\n\n"
+        "You are improving a routing-coordinator prompt fragment for one domain.\n\n"
         "CURRENT FRAGMENT:\n"
         "```markdown\n"
         f"{fragment}\n"
@@ -260,7 +260,7 @@ async def reflect(
         "correctly. Do NOT change the role table or the signal-vocabulary "
         "headers. Output ONLY the revised fragment in markdown — no prose, no "
         "explanation, no code fences. The output is used verbatim as the new "
-        "convener fragment."
+        "coordinator fragment."
     )
     completion = await optimizer_complete(system, user, model=model)
     revised = _strip_fences(completion)
@@ -276,8 +276,8 @@ def _unified_diff(old_fragment: str, new_fragment: str, domain: str) -> str:
     diff = difflib.unified_diff(
         old_fragment.splitlines(),
         new_fragment.splitlines(),
-        fromfile=f"{domain}/convener.md",
-        tofile=f"{domain}/convener.revised.md",
+        fromfile=f"{domain}/routing_policy.md",
+        tofile=f"{domain}/routing_policy.revised.md",
         lineterm="",
         n=1,
     )
@@ -291,14 +291,14 @@ def _unified_diff(old_fragment: str, new_fragment: str, domain: str) -> str:
 
 
 def _write_revised_sibling(pack: DomainPack, fragment: str) -> Path:
-    """Write the revised fragment to domains/<domain>/convener.revised.md.
+    """Write the revised fragment to domains/<domain>/routing_policy.revised.md.
 
-    Sibling of the original convener.md — the original is NEVER clobbered here.
+    Sibling of the original routing_policy.md — the original is NEVER clobbered here.
     (proc_improve --apply may overwrite the original; that's opt-in and lives
     in the process layer, not the engine.)
     """
     domain_dir = Path(pack.path) if pack.path else Path("domains") / pack.domain
-    out_path = domain_dir / "convener.revised.md"
+    out_path = domain_dir / "routing_policy.revised.md"
     out_path.write_text(fragment, encoding="utf-8")
     return out_path
 
@@ -386,7 +386,7 @@ async def improve_rounds(
     before_curves = _curves(baseline_result)
 
     # The incumbent best so far (starts as the unmodified baseline fragment).
-    best_fragment = pack.convener_fragment
+    best_fragment = pack.routing_policy
     best_curves = dict(before_curves)
     best_result = baseline_result
     # The fragment/result we reflect ON next round (always the current best).
@@ -437,7 +437,7 @@ async def improve_rounds(
 
     # Persist the BEST revised sibling + compute the baseline→best diff caption.
     revised_path = _write_revised_sibling(pack, best_fragment)
-    diff_caption = _unified_diff(pack.convener_fragment, best_fragment, pack.domain)
+    diff_caption = _unified_diff(pack.routing_policy, best_fragment, pack.domain)
 
     return {
         "before": before_curves,

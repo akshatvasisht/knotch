@@ -1,15 +1,15 @@
 """Cekura-in-loop scoring source — a real ScoreSource behind the clean seam.
 
-This module implements ``engine.improve.ScoreSource`` against the Cekura REST
+This module implements ``engine.optimizer.ScoreSource`` against the Cekura REST
 API (https://api.cekura.ai). It is a drop-in alternative to the default
 ``LocalRubricScoreSource``: same call shape, an honest ``scored_by`` label of
 ``"Cekura (project <id>)"``, and a run_eval-shaped return dict.
 
 How it scores (no live conversational agent required):
   1. Reuse ``engine.eval_runner.run_eval`` to replay the pack's scenarios
-     through the convener and collect per-decision ``records``.
+     through the coordinator and collect per-decision ``records``.
   2. Render each scenario's decisions as a Cekura transcript (the spoken
-     utterance is the "Testing Agent" turn; the convener's routing decision is
+     utterance is the "Testing Agent" turn; the coordinator's routing decision is
      the "Main Agent" turn).
   3. Ensure one Cekura ``llm_judge`` metric exists per *binary* rubric metric
      (created from the rubric metric's own ``name`` + ``description`` — no
@@ -18,7 +18,7 @@ How it scores (no live conversational agent required):
      until the metric results land.
   5. Map Cekura's per-metric ``score`` + ``explanation`` back onto the records:
      the failure flags (misroute / missed) are taken from the LOCAL replay (the
-     ground truth of what the convener actually routed), and Cekura's
+     ground truth of what the coordinator actually routed), and Cekura's
      ``explanation`` text is *attached* to each failing record so
      ``build_feedback`` can cite Cekura's judge verbatim in the reflection step.
 
@@ -125,7 +125,7 @@ def _render_transcript(scenario_records: list[dict]) -> list[dict]:
     """Render one scenario's decisions as a Cekura ``cekura``-format transcript.
 
     Each routable utterance becomes a "Testing Agent" turn carrying the speaker
-    role id and the spoken text; the convener's resulting routing decision
+    role id and the spoken text; the coordinator's resulting routing decision
     becomes a "Main Agent" turn stating source → recipients. Missed-route
     records (which have no spoken utterance) are surfaced as a Testing Agent
     line so the judge can see the expectation that went unrouted.
@@ -318,8 +318,8 @@ class _CekuraClient:
 class CekuraScoreSource:
     """Score one improvement cycle with Cekura as the judge (real, in-loop).
 
-    Satisfies ``engine.improve.ScoreSource``. The failure *rates* and timing
-    come from the local replay (ground truth of what the convener routed); the
+    Satisfies ``engine.optimizer.ScoreSource``. The failure *rates* and timing
+    come from the local replay (ground truth of what the coordinator routed); the
     per-failure *explanations* come from Cekura's llm_judge metrics built from
     the active rubric. The honest label is ``"Cekura (project <id>)"``.
     """
@@ -349,7 +349,7 @@ class CekuraScoreSource:
     async def _ensure_metrics(self, rubric: dict) -> dict[str, int]:
         """Create-or-reuse a Cekura llm_judge metric per binary rubric metric.
 
-        Metrics are named ``"convener_<rubric_metric_name>"`` so they're stable
+        Metrics are named ``"coordinator_<rubric_metric_name>"`` so they're stable
         across cycles (reused, not duplicated) and namespaced away from the
         project's predefined metrics. Returns ``{rubric_metric_name: cekura_id}``.
         """
@@ -358,7 +358,7 @@ class CekuraScoreSource:
         name_to_id: dict[str, int] = {}
         for metric in judged:
             rname = metric["name"]
-            cekura_name = f"convener_{rname}"
+            cekura_name = f"coordinator_{rname}"
             if cekura_name in existing and existing[cekura_name]:
                 name_to_id[rname] = existing[cekura_name]
                 continue
@@ -381,12 +381,12 @@ class CekuraScoreSource:
         name = metric.get("name", "metric")
         description = metric.get("description", "")
         return (
-            f"You are auditing a message-routing convener from a transcript. "
+            f"You are auditing a message-routing coordinator from a transcript. "
             f"Testing Agent lines are spoken utterances prefixed with the "
-            f"speaker's role id in brackets. Main Agent lines are the convener's "
+            f"speaker's role id in brackets. Main Agent lines are the coordinator's "
             f"ROUTING DECISION for the preceding utterance, listing the source "
             f"role and the recipient role ids it routed to (an empty recipients "
-            f"list means the convener held the message as not relevant).\n\n"
+            f"list means the coordinator held the message as not relevant).\n\n"
             f"Metric '{name}': {description}\n\n"
             f"Score TRUE if the routing in this transcript is correct with "
             f"respect to this metric, FALSE if it is violated. In your "
@@ -429,7 +429,7 @@ class CekuraScoreSource:
                 continue
             ingest = await self._client.ingest_call_log(
                 agent_id=self._agent_id,
-                call_id=f"convener-{scenario_id}-{run_tag}",
+                call_id=f"coordinator-{scenario_id}-{run_tag}",
                 transcript=transcript,
             )
             log_id = ingest.get("id")

@@ -1,6 +1,6 @@
 """Evaluation runner — domain-agnostic.
 
-Replays a DomainPack's scenarios through a ConvenerWorker (backed by the
+Replays a DomainPack's scenarios through a Coordinator (backed by the
 live LLM endpoint) and scores each routing decision against the scenario's
 `expect` labels.
 
@@ -26,7 +26,7 @@ import time
 from typing import Optional
 
 from engine.bus import InMemoryBus
-from engine.convener_worker import ConvenerWorker
+from engine.coordinator import Coordinator
 from engine.interfaces import (
     CHAN_ROUTED,
     DomainPack,
@@ -37,7 +37,7 @@ from engine.interfaces import (
     TYPE_UTTERANCE,
     Utterance,
 )
-from engine.packloader import assemble_system_prompt, load_scaffold
+from engine.domain_loader import assemble_system_prompt, load_scaffold
 from engine.triage import triage
 
 
@@ -90,7 +90,7 @@ def _score_scenario(
         ]
 
         if not decision.recipients:
-            # Convener held — check whether any expect for this source wanted
+            # Coordinator held — check whether any expect for this source wanted
             # an empty route_to (held is correct) or a real route (missed).
             held_expected = [
                 (i, e) for i, e in expected_for_source
@@ -102,7 +102,7 @@ def _score_scenario(
                 outcome = "acted"  # correct hold
                 hold_misroute = False
             else:
-                # Convener held but a routing was expected — wrong hold.
+                # Coordinator held but a routing was expected — wrong hold.
                 outcome = "misroute"
                 hold_misroute = True
             records.append({
@@ -206,7 +206,7 @@ async def _replay_scenario(
     bus: InMemoryBus,
     pack: DomainPack,
 ) -> list[tuple[str, RoutingDecision, float]]:
-    """Inject a scenario's utterances and collect the convener's decisions.
+    """Inject a scenario's utterances and collect the coordinator's decisions.
 
     Returns a list of (utterance_text, RoutingDecision, latency_ms) tuples in
     the order decisions arrive — one decision per routable utterance.
@@ -247,14 +247,14 @@ async def _replay_scenario(
     collector_task = asyncio.create_task(_collect_decisions())
 
     # Inject utterances onto the bus with a short yield between each to allow
-    # the convener worker (running concurrently) to process them in order.
+    # the coordinator worker (running concurrently) to process them in order.
     for i, utt in enumerate(routable_utts):
         publish_ts = time.monotonic()
         utt_publish_times[i] = publish_ts
         await bus.publish(
             Envelope(type=TYPE_UTTERANCE, payload=utt.to_dict(), domain=pack.domain)
         )
-        # Yield so the convener worker can start processing this utterance before
+        # Yield so the coordinator worker can start processing this utterance before
         # the next one is injected. LLM network latency is ~1–3 s so we don't
         # need to sleep between utterances — just one event-loop yield.
         await asyncio.sleep(0)
@@ -310,10 +310,10 @@ async def run_eval(
     pack:
         A fully-loaded DomainPack (use packloader.load_pack).
     prompt_fragment:
-        If provided, use this fragment instead of pack.convener_fragment.
+        If provided, use this fragment instead of pack.routing_policy.
         Useful for the hot-reload pass in the improve loop.
     prompts_dir:
-        Where to find convener_scaffold.md (default: "prompts").
+        Where to find routing_scaffold.md (default: "prompts").
 
     eval_bus:
         Optional bus to publish per-decision EvalScore envelopes to (for live
@@ -326,13 +326,13 @@ async def run_eval(
     """
     from adapters import factory as _llm_factory
 
-    fragment = prompt_fragment if prompt_fragment is not None else pack.convener_fragment
+    fragment = prompt_fragment if prompt_fragment is not None else pack.routing_policy
     scaffold = load_scaffold(prompts_dir=prompts_dir)
 
     # Assemble a temporary DomainPack with the (possibly overridden) fragment
     # so assemble_system_prompt works correctly.
     import dataclasses
-    effective_pack = dataclasses.replace(pack, convener_fragment=fragment)
+    effective_pack = dataclasses.replace(pack, routing_policy=fragment)
 
     system_prompt = assemble_system_prompt(scaffold, effective_pack)
 
@@ -343,7 +343,7 @@ async def run_eval(
         # scenarios (mirrors the real session-per-scenario isolation).
         bus = InMemoryBus()
         llm = _llm_factory.make_llm()
-        worker = ConvenerWorker(
+        worker = Coordinator(
             bus=bus,
             llm=llm,
             system_prompt=system_prompt,

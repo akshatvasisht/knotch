@@ -14,7 +14,7 @@
 #     assigned to <LIVE_ROLE> so the human's live mic is never double-driven.
 #   • Loops indefinitely (~6 s gap between replays) so the demo sustains
 #     while the human talks.
-#   • The convener routes the other roles' utterances back to <LIVE_ROLE>
+#   • The coordinator routes the other roles' utterances back to <LIVE_ROLE>
 #     → the Daily worker speaks the dispatcher message in John's voice into
 #     the human's Daily room.
 #   • The dashboard (http://localhost:7861) lights up with live routing cards.
@@ -23,10 +23,10 @@
 # SAVE → instant-REPLAY flow (no ~4-min re-run on stage):
 #
 #   first time (slow, real Cekura + Nemotron, ~4-5 min — saves a cache file):
-#     CONVENER_BUS=redis python3 -m engine.proc_improve --domain kitchen --cekura --rounds 2 --save
+#     KNOTCH_BUS=redis python3 -m engine.proc_improve --domain kitchen --cekura --rounds 2 --save
 #
 #   thereafter (INSTANT, <1s, no eval/LLM — replays the cached curves):
-#     CONVENER_BUS=redis python3 -m engine.proc_curves --file runs/improve_kitchen.json
+#     KNOTCH_BUS=redis python3 -m engine.proc_curves --file runs/improve_kitchen.json
 #
 # (Neither is run automatically. Run the slow save once before the demo; replay
 #  the cached file live as many times as you like.)
@@ -45,7 +45,7 @@ echo "  Domain:             ${DOMAIN}"
 echo "  Bus:                redis (Upstash)"
 echo ""
 echo "  Injecting ALL other roles' scripted utterances."
-echo "  The convener will route to ${LIVE_ROLE};"
+echo "  The coordinator will route to ${LIVE_ROLE};"
 echo "  you will hear the dispatcher in your Daily room."
 echo "  Dashboard: http://localhost:7861"
 echo ""
@@ -55,7 +55,7 @@ echo ""
 
 cd "$REPO"
 
-exec env CONVENER_BUS=redis python3 -m engine.proc_inject \
+exec env KNOTCH_BUS=redis python3 -m engine.proc_inject \
     --domain "$DOMAIN" \
     --all-scenarios \
     --exclude-role "$LIVE_ROLE" \
@@ -67,8 +67,8 @@ exec env CONVENER_BUS=redis python3 -m engine.proc_inject \
 # Improvement panel (Panel 3) — SAVE once, REPLAY instantly:
 #
 #   first time (slow ~4-5 min; real Cekura + Nemotron; writes a cache file):
-#     CONVENER_BUS=redis python3 -m engine.proc_improve --domain kitchen --cekura --rounds 2 --save
+#     KNOTCH_BUS=redis python3 -m engine.proc_improve --domain kitchen --cekura --rounds 2 --save
 #
 #   thereafter (INSTANT <1s; no eval/LLM; replays the cached curves):
-#     CONVENER_BUS=redis python3 -m engine.proc_curves --file runs/improve_kitchen.json
+#     KNOTCH_BUS=redis python3 -m engine.proc_curves --file runs/improve_kitchen.json
 # ------------------------------------------------------------------

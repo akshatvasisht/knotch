@@ -1,8 +1,8 @@
 # <Your Domain Name> — Domain Fragment
 
 <!--
-  This file is appended to the generic convener scaffold at runtime to form the
-  convener's full system prompt.  It is the ONLY place domain knowledge lives.
+  This file is appended to the generic coordinator scaffold at runtime to form the
+  coordinator's full system prompt.  It is the ONLY place domain knowledge lives.
   The auto-improve loop rewrites this file — keep it factual and concise.
 
   Fill in each section below.  Remove these HTML comments when done.
@@ -12,7 +12,7 @@
 
 <!--
   List every role_id from pack.yaml with a plain-English description of what
-  that participant does and what they are responsible for.  The convener uses
+  that participant does and what they are responsible for.  The coordinator uses
   this to understand who owns what and who should hear what.
 -->
 
@@ -67,7 +67,7 @@
 
 <!--
   Anchor the three urgency levels to concrete operational outcomes in your
-  domain.  This is what the convener uses to assign urgency values.
+  domain.  This is what the coordinator uses to assign urgency values.
 -->
 
 - **high** — TODO: what outcome makes it high urgency in your domain?

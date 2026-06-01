@@ -1,33 +1,22 @@
-# =============================================================================
-# Domain Pack — pack.yaml
-# =============================================================================
-# Copy this entire _template/ directory to domains/<your_domain>/ and fill in
-# every field marked with a TODO comment.  Remove all comments when done.
-#
-# The packloader validates: domain, display_name, dispatcher_voice_id, and a
-# non-empty roles list where each role has role_id + display_name.
-# =============================================================================
+# Copy this directory to domains/<your_domain>/ and fill every TODO field.
+# Remove comments when done.
+# Validated fields: domain, display_name, dispatcher_voice_id, non-empty roles.
 
-# TODO: Short machine-readable identifier for your domain (lowercase, no spaces).
-#       This value is used as a label only — the engine never branches on it.
+# TODO: lowercase identifier, no spaces. Used as a label; the engine never branches on it.
 domain: your_domain
 
 # TODO: Human-readable name shown on the dashboard.
 display_name: "Your Domain Name"
 
-# TODO: The single dispatcher voice that speaks routed messages into every
-#       participant's ear.  Use a voice_id supported by your TTS adapter.
+# TODO: Voice id for the single dispatcher voice that speaks routed messages.
 dispatcher_voice_id: "Magpie-ZeroShot.Female-1"
 
-# TODO: List every participant role that can be active in a session.
-#       The engine loads all roles at startup; the active subset is determined
-#       at runtime by the session configuration.
-#
-#       Fields per role:
-#         role_id       — unique opaque identifier (snake_case, e.g. role_a)
-#         display_name  — shown on the dashboard lane header
-#         voice_id      — the participant's own voice (for STT-side identity);
-#                         leave "" if your TTS adapter does not use per-role voices
+# TODO: One entry per participant role.
+#   role_id      — opaque snake_case key (e.g. role_a)
+#   display_name — dashboard label; KNOTCH_LLM=fake uses this for narrow routing
+#                  (a display_name substring in an utterance routes to that role).
+#                  Keep names short and distinct to avoid false matches.
+#   voice_id     — STT-side identity; "" if your TTS adapter does not use it.
 roles:
   - role_id: role_a
     display_name: "Role A"
@@ -37,14 +26,7 @@ roles:
     display_name: "Role B"
     voice_id: "Magpie-ZeroShot.Male-2"
 
-  # TODO: Add more roles as needed.  For the N=2 live demo mode you only need
-  #       two active roles; additional roles can exist here for N=4 mode.
-  # - role_id: role_c
-  #   display_name: "Role C"
-  #   voice_id: "Magpie-ZeroShot.Female-2"
-
-# These filenames are relative to this directory. Change them only if you
-# rename the files.
-convener_fragment: convener.md
+# Filenames are relative to this directory.
+routing_policy: routing_policy.md
 rubric: rubric.yaml
 scenarios: scenarios.yaml
